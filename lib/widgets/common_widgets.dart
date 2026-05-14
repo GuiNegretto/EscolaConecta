@@ -58,7 +58,7 @@ class NewBadge extends StatelessWidget {
       ),
       child: const Text(
         'Nova',
-        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -74,7 +74,7 @@ class MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = DateFormat('dd/MM HH:mm').format(message.sentAt);
+    final dateStr = DateFormat('dd/MM HH:mm').format(message.createdAt);
 
     return GestureDetector(
       onTap: onTap,
@@ -94,7 +94,6 @@ class MessageCard extends StatelessWidget {
                       Text(
                         message.title,
                         style: TextStyle(
-                          color: Colors.white,
                           fontSize: 15,
                           fontWeight: message.isNew ? FontWeight.w700 : FontWeight.w500,
                         ),
@@ -149,7 +148,7 @@ class AdminMessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = DateFormat('dd/MM HH:mm').format(message.sentAt);
+    final dateStr = DateFormat('dd/MM HH:mm').format(message.createdAt);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -188,7 +187,6 @@ class AdminMessageCard extends StatelessWidget {
                 Text(
                   message.title,
                   style: const TextStyle(
-                      color: Colors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.w600),
                 ),
@@ -292,7 +290,6 @@ class SectionHeader extends StatelessWidget {
       children: [
         Text(title,
             style: const TextStyle(
-                color: Colors.white,
                 fontSize: 17,
                 fontWeight: FontWeight.w600)),
         if (trailing != null) trailing!,
@@ -365,7 +362,6 @@ class AppTextField extends StatelessWidget {
       children: [
         Text(label,
             style: const TextStyle(
-                color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w500)),
         const SizedBox(height: 6),
@@ -376,7 +372,7 @@ class AppTextField extends StatelessWidget {
           maxLines: maxLines,
           onChanged: onChanged,
           validator: validator,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(),
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: prefixIcon,
@@ -412,7 +408,6 @@ class EmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           Text(title,
               style: const TextStyle(
-                  color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),

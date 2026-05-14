@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_provider.dart';
+import '../../services/theme_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 import 'parent_message_detail_screen.dart';
@@ -18,16 +19,29 @@ class ParentMessagesScreen extends StatefulWidget {
 
 class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
   final _api = ApiService();
+  late ScrollController _scrollController;
   List<Message> _messages = [];
   bool _loading = true;
   String _filter = 'Todas';
 
   final _filters = ['Todas', 'Reunião', 'Lembrete', 'Cultural', 'Urgente'];
 
+  List<Message> get _filtered {
+    if (_filter == 'Todas') return _messages;
+    return _messages.where((m) => m.typeLabel == _filter).toList();
+  }
+
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -43,11 +57,6 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
     }
   }
 
-  List<Message> get _filtered {
-    if (_filter == 'Todas') return _messages;
-    return _messages.where((m) => m.typeLabel == _filter).toList();
-  }
-
   int get _newCount => _messages.where((m) => m.isNew).length;
 
   @override
@@ -61,11 +70,21 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
         automaticallyImplyLeading: false,
         title: const Text('Mensagens'),
         actions: [
+          Consumer<ThemeProvider>(
+            builder: (ctx, themeProvider, _) => IconButton(
+              icon: Icon(
+                themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+              ),
+              onPressed: () => themeProvider.toggleTheme(),
+              tooltip: themeProvider.isDarkMode ? 'Modo Claro' : 'Modo Escuro',
+            ),
+          ),
           IconButton(
             icon: Stack(
               clipBehavior: Clip.none,
               children: [
-                const Icon(Icons.notifications_outlined, color: Colors.white),
+                Icon(Icons.notifications_outlined,
+                    color: Theme.of(context).colorScheme.onPrimary),
                 if (_newCount > 0)
                   Positioned(
                     right: -4,
@@ -80,8 +99,8 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
                       child: Center(
                         child: Text(
                           '$_newCount',
-                          style: const TextStyle(
-                              color: Colors.white,
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimary,
                               fontSize: 10,
                               fontWeight: FontWeight.bold),
                         ),
@@ -96,7 +115,8 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.person_outline, color: Colors.white),
+            icon: Icon(Icons.person_outline,
+                color: Theme.of(context).colorScheme.onPrimary),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ParentProfileScreen()),
@@ -104,7 +124,8 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
           ),
           Builder(
             builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu, color: Colors.white),
+              icon: Icon(Icons.menu,
+                  color: Theme.of(context).colorScheme.onPrimary),
               onPressed: () => Scaffold.of(ctx).openDrawer(),
             ),
           ),
@@ -122,8 +143,9 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
               isExpanded: true,
               dropdownColor: Theme.of(context).colorScheme.surface,
               underline: const SizedBox(),
-              icon: Icon(Icons.keyboard_arrow_down, color: Theme.of(context).textTheme.bodyMedium?.color),
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              icon: const Icon(Icons.keyboard_arrow_down),
+              iconEnabledColor: Theme.of(context).colorScheme.onSurface,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14),
               items: _filters
                   .map((f) => DropdownMenuItem(value: f, child: Text(f)))
                   .toList(),
@@ -146,6 +168,7 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
                         onRefresh: _load,
                         color: AppTheme.accentBlue,
                         child: ListView.separated(
+                          controller: _scrollController,
                           itemCount: _filtered.length,
                           separatorBuilder: (_, __) =>
                               Divider(height: 1, color: Theme.of(context).dividerColor),
@@ -185,26 +208,32 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
                   child: Icon(Icons.person, color: AppTheme.accentBlue, size: 30),
                 ),
                 const SizedBox(height: 10),
-                Text(user?.name ?? '',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600)),
-                Text(user?.email ?? '',
-                    style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  user?.name ?? '',
+                  style: Theme.of(context)
+                      .primaryTextTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  user?.email ?? '',
+                  style: Theme.of(context).primaryTextTheme.bodySmall,
+                ),
               ],
             ),
           ),
           ListTile(
-            leading: const Icon(Icons.inbox_outlined, color: AppTheme.accentBlue),
-            title: const Text('Mensagens', style: TextStyle(color: Colors.white)),
+            leading: Icon(Icons.inbox_outlined,
+                color: Theme.of(context).colorScheme.primary),
+            title: Text('Mensagens',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
             onTap: () => Navigator.pop(context),
           ),
           ListTile(
-            leading:
-                const Icon(Icons.notifications_outlined, color: AppTheme.accentBlue),
-            title:
-                const Text('Notificações', style: TextStyle(color: Colors.white)),
+            leading: Icon(Icons.notifications_outlined,
+                color: Theme.of(context).colorScheme.primary),
+            title: Text('Notificações',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
@@ -215,8 +244,10 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.person_outline, color: AppTheme.accentBlue),
-            title: const Text('Meu Perfil', style: TextStyle(color: Colors.white)),
+            leading: Icon(Icons.person_outline,
+                color: Theme.of(context).colorScheme.primary),
+            title: Text('Meu Perfil',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(

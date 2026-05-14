@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_provider.dart';
+import '../../services/theme_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -64,6 +65,17 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
         backgroundColor: AppTheme.primaryBlue,
         title: const Text('Meu Perfil'),
         leading: const BackButton(color: Colors.white),
+        actions: [
+          Consumer<ThemeProvider>(
+            builder: (ctx, themeProvider, _) => IconButton(
+              icon: Icon(
+                themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+              ),
+              onPressed: () => themeProvider.toggleTheme(),
+              tooltip: themeProvider.isDarkMode ? 'Modo Claro' : 'Modo Escuro',
+            ),
+          ),
+        ],
       ),
       body: LoadingOverlay(
         isLoading: _saving,

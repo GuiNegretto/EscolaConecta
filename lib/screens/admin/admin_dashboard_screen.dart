@@ -4,11 +4,14 @@ import '../../models/models.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_provider.dart';
 import '../../utils/app_theme.dart';
-import '../../widgets/common_widgets.dart';
+import '../../widgets/admin_dashboard_widgets.dart';
+import '../../services/theme_provider.dart';
 import 'admin_send_message_screen.dart';
 import 'admin_register_parent_screen.dart';
 import 'admin_register_student_screen.dart';
 import 'admin_import_screen.dart';
+import 'admin_student_parent_links_screen.dart';
+import 'admin_message_detail_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -17,54 +20,150 @@ class AdminDashboardScreen extends StatefulWidget {
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+class _AdminDashboardScreenState extends State<AdminDashboardScreen>
+    with SingleTickerProviderStateMixin {
   final _api = ApiService();
-  List<Message> _messages = [];
+  late ScrollController _scrollController;
+  List<Message> _allMessages = [];
   bool _loading = true;
-  String _msgFilter = 'Todas';
+  String _selectedFilter = 'Todas';
+  late TabController _tabController;
+
+  final _statusFilters = [
+    'Todas',
+    'Rascunhos',
+    'Agendadas',
+    'Pendentes',
+    'Enviadas',
+  ];
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _tabController = TabController(length: 2, vsync: this);
     _load();
+    // Atualizar a cada 30 segundos
+    Future.delayed(Duration.zero, _setupAutoRefresh);
+  }
+
+  void _setupAutoRefresh() {
+    Future.delayed(const Duration(seconds: 30), () {
+      if (mounted) {
+        _load();
+        _setupAutoRefresh();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final msgs = await _api.getMessages();
+      final msgs = await _api.getAdminMessages();
       setState(() {
-        _messages = msgs;
+        _allMessages = msgs;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       setState(() => _loading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao carregar: $e')),
+        );
+      }
     }
+  }
+
+  List<Message> _getFilteredMessages() {
+    switch (_selectedFilter) {
+      case 'Rascunhos':
+        return _allMessages
+            .where((m) => m.status == MessageStatus.draft)
+            .toList();
+      case 'Agendadas':
+        return _allMessages
+            .where((m) => m.status == MessageStatus.scheduled)
+            .toList();
+      case 'Pendentes':
+        return _allMessages
+            .where((m) => m.status == MessageStatus.pending)
+            .toList();
+      case 'Enviadas':
+        return _allMessages
+            .where((m) => m.status == MessageStatus.sent)
+            .toList();
+      default:
+        return _allMessages;
+    }
+  }
+
+  Map<String, int> _getStats() {
+    return {
+      'drafts': _allMessages
+          .where((m) => m.status == MessageStatus.draft)
+          .length,
+      'scheduled': _allMessages
+          .where((m) => m.status == MessageStatus.scheduled)
+          .length,
+      'sent_today': _allMessages
+          .where((m) =>
+              m.status == MessageStatus.sent &&
+              m.sentAt?.isAfter(DateTime.now().subtract(const Duration(days: 1))) ==
+                  true)
+          .length,
+      'total_impact': _allMessages.fold<int>(
+          0, (sum, m) => sum + (m.recipientCount ?? 0)),
+      'failed': _allMessages
+          .where((m) => m.status == MessageStatus.failed)
+          .length,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
     final user = context.read<AuthProvider>().user;
+    final stats = _getStats();
+    final filteredMessages = _getFilteredMessages();
 
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
       appBar: AppBar(
         backgroundColor: AppTheme.primaryBlue,
         automaticallyImplyLeading: false,
-        title: const Text('Dashboard'),
+        elevation: 0,
+        title: const Text('Central de Comunicados'),
         actions: [
+          Consumer<ThemeProvider>(
+            builder: (ctx, themeProvider, _) => IconButton(
+              icon: Icon(
+                themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+              ),
+              onPressed: () => themeProvider.toggleTheme(),
+              tooltip: themeProvider.isDarkMode ? 'Modo Claro' : 'Modo Escuro',
+            ),
+          ),
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
+            icon: const Icon(Icons.refresh),
+            onPressed: _load,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
             onPressed: () async {
               await context.read<AuthProvider>().logout();
-              if (!context.mounted) return;
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/', (_) => false);
+              if (!mounted) return;
+              Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
             },
           ),
           Builder(
             builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu, color: Colors.white),
+              icon: const Icon(Icons.menu),
               onPressed: () => Scaffold.of(ctx).openDrawer(),
             ),
           ),
@@ -74,216 +173,541 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         color: AppTheme.accentBlue,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Quick Actions
-              const Text('Ações Rápidas',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(height: 12),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 2.2,
-                children: [
-                  QuickActionButton(
-                    icon: Icons.chat_outlined,
-                    label: 'Nova Mensagem',
-                    isPrimary: true,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const AdminSendMessageScreen()),
-                    ).then((_) => _load()),
-                  ),
-                  QuickActionButton(
-                    icon: Icons.person_add_outlined,
-                    label: 'Cadastrar Pais',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const AdminRegisterParentScreen()),
-                    ),
-                  ),
-                  QuickActionButton(
-                    icon: Icons.school_outlined,
-                    label: 'Cadastrar Alunos',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const AdminRegisterStudentScreen()),
-                    ),
-                  ),
-                  QuickActionButton(
-                    icon: Icons.upload_outlined,
-                    label: 'Importar Planilha',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const AdminImportScreen()),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppTheme.accentBlue),
+              )
+            : SingleChildScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ─── AÇÕES RÁPIDAS ──────────────────────────────────────
+                    _buildQuickActionsSection(context),
+                    const SizedBox(height: 20),
 
-              // Recent Messages
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Mensagens Recentes',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600)),
-                  DropdownButton<String>(
-                    value: _msgFilter,
-                    dropdownColor: Theme.of(context).cardColor,
-                    underline: const SizedBox(),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-  fontSize: 13
-),
-                    items: ['Todas', 'Turma', 'Individual']
-                        .map((f) =>
-                            DropdownMenuItem(value: f, child: Text(f)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _msgFilter = v!),
-                  ),
-                ],
+                    // ─── RESUMO (Summary Cards) ──────────────────────────────
+                    _buildSummarySection(context, stats),
+                    const SizedBox(height: 20),
+
+                    // ─── CENTRAL DE COMUNICADOS ──────────────────────────────
+                    _buildCommunicationCenter(context, filteredMessages),
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              if (_loading)
-                const Center(
-                    child:
-                        CircularProgressIndicator(color: AppTheme.accentBlue))
-              else if (_messages.isEmpty)
-                const EmptyState(
-                  icon: Icons.inbox_outlined,
-                  title: 'Sem mensagens',
-                  subtitle: 'Nenhuma mensagem enviada ainda.',
-                )
-              else
-                ...(_messages.take(10).map(
-                      (m) => AdminMessageCard(message: m),
-                    )),
-            ],
-          ),
-        ),
       ),
+    );
+  }
+
+  Widget _buildSummarySection(BuildContext context, Map<String, int> stats) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.trending_up, color: AppTheme.accentBlue, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Resumo de Atividades',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        GridView.count(
+          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 5 : 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 1.1,
+          children: [
+            SummaryCard(
+              label: 'Rascunhos',
+              count: stats['drafts'] ?? 0,
+              icon: Icons.edit,
+              color: Colors.grey,
+              onTap: () => setState(() => _selectedFilter = 'Rascunhos'),
+            ),
+            SummaryCard(
+              label: 'Agendadas',
+              count: stats['scheduled'] ?? 0,
+              icon: Icons.schedule,
+              color: Colors.blue,
+              onTap: () => setState(() => _selectedFilter = 'Agendadas'),
+            ),
+            SummaryCard(
+              label: 'Enviadas Hoje',
+              count: stats['sent_today'] ?? 0,
+              icon: Icons.check_circle,
+              color: Colors.green,
+              onTap: () => setState(() => _selectedFilter = 'Enviadas'),
+            ),
+            SummaryCard(
+              label: 'Total Impactado',
+              count: stats['total_impact'] ?? 0,
+              icon: Icons.people,
+              color: AppTheme.accentBlue,
+            ),
+            SummaryCard(
+              label: 'Falhas',
+              count: stats['failed'] ?? 0,
+              icon: Icons.error,
+              color: Colors.red,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionsSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Ações Rápidas',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+              ),
+        ),
+        const SizedBox(height: 10),
+        GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 1.0,
+          children: [
+            QuickAccessButton(
+              icon: Icons.mail_outline,
+              label: 'Nova Mensagem',
+              color: AppTheme.primaryBlue,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AdminSendMessageScreen()),
+              ).then((_) => _load()),
+            ),
+            QuickAccessButton(
+              icon: Icons.person_add_outlined,
+              label: 'Cadastrar Pai',
+              color: Colors.blue,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AdminRegisterParentScreen()),
+              ).then((_) => _load()),
+            ),
+            QuickAccessButton(
+              icon: Icons.school_outlined,
+              label: 'Cadastrar Aluno',
+              color: Colors.green,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AdminRegisterStudentScreen()),
+              ).then((_) => _load()),
+            ),
+            QuickAccessButton(
+              icon: Icons.link,
+              label: 'Gerenciar Vínculos',
+              color: Colors.purple,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) =>
+                        const AdminStudentParentLinksScreen()),
+              ).then((_) => _load()),
+            ),
+            QuickAccessButton(
+              icon: Icons.upload_file_outlined,
+              label: 'Importar',
+              color: Colors.orange,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminImportScreen()),
+              ).then((_) => _load()),
+            ),
+            QuickAccessButton(
+              icon: Icons.history,
+              label: 'Histórico',
+              color: Colors.indigo,
+              onTap: () {
+                // TODO: Implementar histórico completo
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Histórico em desenvolvimento')),
+                );
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCommunicationCenter(
+      BuildContext context, List<Message> messages) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Central de Comunicados',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AdminSendMessageScreen()),
+              ).then((_) => _load()),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Nova'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // ─── FILTROS ─────────────────────────────────────────────────
+        MessageStatusFilter(
+          selected: _selectedFilter,
+          filters: _statusFilters,
+          onChanged: (filter) => setState(() => _selectedFilter = filter),
+        ),
+        const SizedBox(height: 12),
+
+        // ─── LISTA DE MENSAGENS ──────────────────────────────────────
+        if (messages.isEmpty)
+          SizedBox(
+            height: 300,
+            child: CommunicationEmptyState(
+              title: 'Nenhuma mensagem',
+              subtitle: 'Comece criando uma nova mensagem para se comunicar',
+              icon: Icons.inbox_outlined,
+              onAction: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AdminSendMessageScreen()),
+              ).then((_) => _load()),
+              actionLabel: 'Criar Mensagem',
+            ),
+          )
+        else
+          Column(
+            children: messages.map((msg) {
+              return AdminMessageListCard(
+                message: msg,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        AdminMessageDetailScreen(messageId: msg.id),
+                  ),
+                ).then((_) => _load()),
+                onEdit: msg.canEdit
+                    ? () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AdminSendMessageScreen(
+                              messageId: msg.id,
+                            ),
+                          ),
+                        ).then((_) => _load())
+                    : null,
+                onSend: msg.canSend
+                    ? () async {
+                        // TODO: Implementar envio
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Enviar Mensagem?'),
+                            content: Text(
+                              'Enviar "${msg.title}" agora?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('Cancelar'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  Navigator.pop(ctx);
+                                  // Implementar lógica de envio
+                                  _load();
+                                },
+                                child: const Text('Enviar'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    : null,
+                onDelete: () async {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Deletar Mensagem?'),
+                      content: Text(
+                        'Esta ação não pode ser desfeita.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar'),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            // TODO: Implementar delete
+                            _load();
+                          },
+                          child: const Text('Deletar'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+          ),
+      ],
     );
   }
 
   Widget _buildDrawer(BuildContext context, User? user) {
     return Drawer(
-      backgroundColor: Theme.of(context).cardColor,
-      child: Column(
-        children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(color: AppTheme.primaryBlue),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // ── Drawer Header ──────────────────────────────────────────────
+            DrawerHeader(
+              decoration: const BoxDecoration(
+                color: AppTheme.primaryBlue,
+                borderRadius: BorderRadius.zero,
+              ),
+              margin: EdgeInsets.zero,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentBlue.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const CircleAvatar(
+                      backgroundColor: AppTheme.darkBg,
+                      radius: 24,
+                      child: Icon(Icons.shield_outlined,
+                          color: AppTheme.accentBlue, size: 26),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    user?.name ?? 'Administrador',
+                    style: Theme.of(context)
+                        .primaryTextTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Central de Comunicados',
+                    style: Theme.of(context).primaryTextTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).primaryTextTheme.bodySmall?.color?.withOpacity(0.8),
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // ── Navigation Items ──────────────────────────────────────────
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.dashboard_outlined,
+                    label: 'Dashboard',
+                    onTap: () => Navigator.pop(context),
+                    isSelected: true,
+                  ),
+                  const SizedBox(height: 4),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.mail_outlined,
+                    label: 'Nova Mensagem',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AdminSendMessageScreen()));
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.people_outlined,
+                    label: 'Responsáveis',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AdminRegisterParentScreen()));
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.school_outlined,
+                    label: 'Alunos',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AdminRegisterStudentScreen()));
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.upload_file_outlined,
+                    label: 'Importar Planilha',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AdminImportScreen()));
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Logout Section ────────────────────────────────────────────
+            Divider(
+              height: 1,
+              color: Theme.of(context).dividerColor,
+            ),
+            _buildDrawerItem(
+              context: context,
+              icon: Icons.logout,
+              label: 'Sair',
+              onTap: () async {
+                await context.read<AuthProvider>().logout();
+                if (!mounted) return;
+                Navigator.pushNamedAndRemoveUntil(
+                    context, '/', (_) => false);
+              },
+              isDangerous: true,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isSelected = false,
+    bool isDangerous = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          splashColor: AppTheme.accentBlue.withOpacity(0.1),
+          highlightColor: AppTheme.accentBlue.withOpacity(0.05),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AppTheme.accentBlue.withOpacity(0.1)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: isSelected
+                  ? Border.all(
+                      color: AppTheme.accentBlue.withOpacity(0.3),
+                      width: 1,
+                    )
+                  : null,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
               children: [
-                const CircleAvatar(
-                  backgroundColor: AppTheme.darkBg,
-                  radius: 28,
-                  child: Icon(Icons.shield_outlined,
-                      color: AppTheme.accentBlue, size: 28),
+                Icon(
+                  icon,
+                  color: isDangerous
+                      ? AppTheme.danger
+                      : isSelected
+                          ? AppTheme.accentBlue
+                          : Theme.of(context).colorScheme.onSurface,
+                  size: 22,
                 ),
-                const SizedBox(height: 10),
-                Text(user?.name ?? 'Administrador',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600)),
-                 Text('Escola',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-  fontSize: 12
-)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isDangerous
+                          ? AppTheme.danger
+                          : isSelected
+                              ? AppTheme.accentBlue
+                              : Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                if (isSelected)
+                  Container(
+                    width: 3,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentBlue,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
               ],
             ),
           ),
-          ListTile(
-            leading:
-                const Icon(Icons.dashboard_outlined, color: AppTheme.accentBlue),
-            title:
-                const Text('Dashboard', style: TextStyle(color: Colors.white)),
-            onTap: () => Navigator.pop(context),
-          ),
-          ListTile(
-            leading:
-                const Icon(Icons.send_outlined, color: AppTheme.accentBlue),
-            title: const Text('Enviar Mensagem',
-                style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const AdminSendMessageScreen()));
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.people_outlined, color: AppTheme.accentBlue),
-            title: const Text('Responsáveis',
-                style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const AdminRegisterParentScreen()));
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.school_outlined, color: AppTheme.accentBlue),
-            title:
-                const Text('Alunos', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const AdminRegisterStudentScreen()));
-            },
-          ),
-          ListTile(
-            leading:
-                const Icon(Icons.upload_file_outlined, color: AppTheme.accentBlue),
-            title: const Text('Importar Planilha',
-                style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const AdminImportScreen()));
-            },
-          ),
-          const Spacer(),
-          Divider(color: Theme.of(context).dividerColor),
-          ListTile(
-            leading: const Icon(Icons.logout, color: AppTheme.danger),
-            title:
-                const Text('Sair', style: TextStyle(color: AppTheme.danger)),
-            onTap: () async {
-              await context.read<AuthProvider>().logout();
-              if (!context.mounted) return;
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/', (_) => false);
-            },
-          ),
-          const SizedBox(height: 16),
-        ],
+        ),
       ),
     );
   }

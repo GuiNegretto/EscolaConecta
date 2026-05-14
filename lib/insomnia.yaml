@@ -1,0 +1,906 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: EscolaConecta API
+meta:
+  id: wrk_fce7ba314e5743f6ae4f5c182d3d7f49
+  created: 1777479294388
+  modified: 1777479294388
+  description: ""
+collection:
+  - name: 🔐 Auth
+    meta:
+      id: fld_7dc77f3855c04b798ac7e86c01adbcaa
+      created: 1777479294401
+      modified: 1777479294401
+      sortKey: -1777479294402
+      description: Endpoints públicos de autenticação
+    children:
+      - url: "{{ _.base_url }}/auth/login"
+        name: Login (Admin)
+        meta:
+          id: req_c614f1db9b474c2f94f91a0b6b8be581
+          created: 1777479294422
+          modified: 1777479294422
+          isPrivate: false
+          description: Autentica um admin e retorna JWT. Copie o token para token_admin no
+            environment.
+          sortKey: -1777479294422
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "email": "admin@escola.com",
+              "password": "senha123"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/auth/login"
+        name: Login (Guardian)
+        meta:
+          id: req_5d006a7e1fc94cc39e72e000ef5b94ae
+          created: 1777479294427
+          modified: 1777479710347
+          isPrivate: false
+          description: Autentica um responsável e retorna JWT. Copie o token para
+            token_guardian no environment.
+          sortKey: -1777479294427
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "email": "maria@email.com",
+              "password": "119900"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/auth/change-password"
+        name: Trocar Senha (Primeiro Acesso)
+        meta:
+          id: req_344c610da8d84debaf3025de6a7cb4cc
+          created: 1777479294431
+          modified: 1777479294431
+          isPrivate: false
+          description: Troca a senha no primeiro acesso. Requer JWT (qualquer role).
+            current_password = senha temporária gerada no cadastro.
+          sortKey: -1777479294431
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "current_password": "119900",
+              "new_password": "novaSenha123"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: Authorization
+            value: Bearer {{ _.token_guardian }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/auth/login"
+        name: ⚠ Login — Credenciais Inválidas
+        meta:
+          id: req_4bd038895be04514b0e438e36b1d5453
+          created: 1777479294511
+          modified: 1777479294511
+          isPrivate: false
+          description: Deve retornar 401 com success=false.
+          sortKey: -1777479294511
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "email": "naoexiste@email.com",
+              "password": "senhaerrada"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: 📢 Admin — Mensagens
+    meta:
+      id: fld_5b07517c470b466d981c56e2f435c3f2
+      created: 1777479294406
+      modified: 1777479294406
+      sortKey: -1777479294406
+      description: Envio e consulta de mensagens (requer role=admin)
+    children:
+      - url: "{{ _.base_url }}/admin/messages"
+        name: Enviar Mensagem — Geral
+        meta:
+          id: req_add8fdcbb2f44484b1913a50f068874d
+          created: 1777479294434
+          modified: 1777479294434
+          isPrivate: false
+          description: Envia mensagem para TODOS os responsáveis cadastrados. Sem arquivos.
+          sortKey: -1777479294434
+        method: POST
+        body:
+          mimeType: multipart/form-data
+          params:
+            - name: title
+              value: Reunião de Pais — Outubro
+            - name: body
+              value: Informamos que haverá reunião de pais no dia 15/10 às 19h no auditório.
+            - name: type
+              value: geral
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/messages"
+        name: Enviar Mensagem — Turma
+        meta:
+          id: req_93b6267d854b44d9ac735783d84b8ffe
+          created: 1777479294437
+          modified: 1777479294437
+          isPrivate: false
+          description: Envia mensagem para todos os responsáveis de alunos de uma turma
+            específica.
+          sortKey: -1777479294437
+        method: POST
+        body:
+          mimeType: multipart/form-data
+          params:
+            - name: title
+              value: Passeio Escolar — 3º Ano A
+            - name: body
+              value: O passeio ao museu está confirmado para o dia 20/10. Autorização
+                necessária.
+            - name: type
+              value: turma
+            - name: grade
+              value: 3º Ano
+            - name: class
+              value: A
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/messages"
+        name: Enviar Mensagem — Individual
+        meta:
+          id: req_8faf186efc304f2ebfc80e7880333e1e
+          created: 1777479294440
+          modified: 1777479294440
+          isPrivate: false
+          description: Envia mensagem para responsáveis específicos. Informe
+            guardian_ids[] com os IDs.
+          sortKey: -1777479294440
+        method: POST
+        body:
+          mimeType: multipart/form-data
+          params:
+            - name: title
+              value: Ocorrência — João Silva
+            - name: body
+              value: Seu filho apresentou comportamento inadequado em sala. Favor entrar em
+                contato.
+            - name: type
+              value: individual
+            - name: guardian_ids[]
+              value: "1"
+            - name: guardian_ids[]
+              value: "2"
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/messages"
+        name: Enviar Mensagem — Com Anexo (imagem)
+        meta:
+          id: req_1a17b4cfc8794302b07807ada571dacd
+          created: 1777479294444
+          modified: 1777480125008
+          isPrivate: false
+          description: Envia mensagem geral com imagem anexada. Selecione um arquivo
+            .jpg/.png no campo files[].
+          sortKey: -1777479294444
+        method: POST
+        body:
+          mimeType: multipart/form-data
+          params:
+            - name: title
+              value: Cardápio da Semana
+            - name: body
+              value: Segue o cardápio da semana em anexo.
+            - name: type
+              value: geral
+            - name: files[]
+              description: Selecione uma imagem (jpg, jpeg, png, gif — máx 10MB)
+              fileName: C:\Users\Henry\Pictures\93iqqu.jpg
+              type: file
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/messages"
+        name: Listar Mensagens
+        meta:
+          id: req_3b8203411ea841f9a3e6e9fcca36497a
+          created: 1777479294447
+          modified: 1777479294447
+          isPrivate: false
+          description: "Lista todas as mensagens enviadas. Filtros opcionais:
+            ?type=turma&class=1A"
+          sortKey: -1777479294447
+        method: GET
+        parameters:
+          - name: type
+            value: ""
+            disabled: true
+          - name: class
+            value: ""
+            disabled: true
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/messages"
+        name: Listar Mensagens — Filtro por Turma
+        meta:
+          id: req_3f9762feef274137b41d774190bebe6a
+          created: 1777479294450
+          modified: 1777479294450
+          isPrivate: false
+          description: Lista mensagens filtradas por tipo turma e turma específica.
+          sortKey: -1777479294450
+        method: GET
+        parameters:
+          - name: type
+            value: turma
+          - name: class
+            value: A
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/messages/1"
+        name: Detalhe da Mensagem
+        meta:
+          id: req_ae54cddc4a1d4f51a06f104dfd3522d6
+          created: 1777479294453
+          modified: 1777486625753
+          isPrivate: false
+          description: "Retorna detalhe completo: destinatários, status de leitura e
+            anexos com URL."
+          sortKey: -1777479294453
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: 🎒 Admin — Alunos
+    meta:
+      id: fld_aba0afd9f8d64c5884b119d9a364579b
+      created: 1777479294411
+      modified: 1777479294411
+      sortKey: -1777479294411
+      description: CRUD de alunos (requer role=admin)
+    children:
+      - url: "{{ _.base_url }}/admin/students"
+        name: Listar Alunos
+        meta:
+          id: req_352dfc254cbd44c18481d7032fb631da
+          created: 1777479294456
+          modified: 1777479294456
+          isPrivate: false
+          description: "Lista todos os alunos. Filtros opcionais: ?grade=3º Ano&class=A"
+          sortKey: -1777479294456
+        method: GET
+        parameters:
+          - name: grade
+            value: ""
+            disabled: true
+          - name: class
+            value: ""
+            disabled: true
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/students"
+        name: Cadastrar Aluno
+        meta:
+          id: req_2dc1f0af17bd4c8685899d60d84537e3
+          created: 1777479294460
+          modified: 1777479294460
+          isPrivate: false
+          description: "Cria um novo aluno. Campos obrigatórios: name, grade, class."
+          sortKey: -1777479294460
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "João da Silva",
+              "grade": "3º Ano",
+              "class": "A"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/students/{{ _.student_id }}"
+        name: Detalhe do Aluno
+        meta:
+          id: req_5bfb769aa98541448322079114807fcb
+          created: 1777479294463
+          modified: 1777479294463
+          isPrivate: false
+          description: Retorna dados do aluno e lista de responsáveis vinculados.
+          sortKey: -1777479294463
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/students/{{ _.student_id }}"
+        name: Atualizar Aluno
+        meta:
+          id: req_7934103847324a258f56bc8f49715bb9
+          created: 1777479294465
+          modified: 1777479294465
+          isPrivate: false
+          description: Atualiza name, grade e class do aluno.
+          sortKey: -1777479294465
+        method: PUT
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "João da Silva Atualizado",
+              "grade": "4º Ano",
+              "class": "B"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/students/{{ _.student_id }}"
+        name: Remover Aluno
+        meta:
+          id: req_a193eb91ca3c4f9089477c00e41b70b3
+          created: 1777479294468
+          modified: 1777479294468
+          isPrivate: false
+          description: Remove o aluno e seus vínculos com responsáveis (CASCADE).
+          sortKey: -1777479294468
+        method: DELETE
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/students"
+        name: ⚠ Sem Token — Deve retornar 401
+        meta:
+          id: req_a8f6253f358b47de985477b6000d169c
+          created: 1777479294514
+          modified: 1777479294514
+          isPrivate: false
+          description: Requisição sem Authorization header. Deve retornar 401.
+          sortKey: -1777479294514
+        method: GET
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/students"
+        name: ⚠ Guardian acessando rota Admin — Deve retornar 403
+        meta:
+          id: req_404134df651641e6b057ce32aeb628ae
+          created: 1777479294517
+          modified: 1777479294517
+          isPrivate: false
+          description: Usa token de guardian em rota de admin. Deve retornar 403.
+          sortKey: -1777479294517
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_guardian }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: 👨‍👩‍👧 Admin — Responsáveis
+    meta:
+      id: fld_4f10a41761fb46ba86127543f9212084
+      created: 1777479294414
+      modified: 1777479294414
+      sortKey: -1777479294414
+      description: CRUD de responsáveis (requer role=admin)
+    children:
+      - url: "{{ _.base_url }}/admin/guardians"
+        name: Listar Responsáveis
+        meta:
+          id: req_f3aa1d5d970840e58f79109c206195b4
+          created: 1777479294471
+          modified: 1777486523948
+          isPrivate: false
+          description: Lista todos os responsáveis com seus alunos vinculados.
+          sortKey: -1777479294471
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/guardians"
+        name: Cadastrar Responsável
+        meta:
+          id: req_886af0984f874bf0b277f2eeb2d90bc9
+          created: 1777479294474
+          modified: 1777479294474
+          isPrivate: false
+          description: Cria responsável com role=guardian. Senha temporária = primeiros 6
+            dígitos do telefone. Retorna temporary_password no data.
+          sortKey: -1777479294474
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "Maria Oliveira",
+              "email": "maria@email.com",
+              "phone": "11990012345",
+              "student_ids": [1]
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/guardians"
+        name: Cadastrar Responsável (sem aluno)
+        meta:
+          id: req_d974d76e4c0e49e0a413ef5defa1b445
+          created: 1777479294478
+          modified: 1777479294478
+          isPrivate: false
+          description: Cria responsável sem vincular a nenhum aluno. student_ids pode ser
+            omitido ou vazio.
+          sortKey: -1777479294478
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "Carlos Souza",
+              "email": "carlos@email.com",
+              "phone": "21988887777",
+              "student_ids": []
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/guardians/{{ _.guardian_id }}"
+        name: Detalhe do Responsável
+        meta:
+          id: req_78f157f23f4d4f3d98fc516b0e27a584
+          created: 1777479294480
+          modified: 1777479294480
+          isPrivate: false
+          description: Retorna dados do responsável e alunos vinculados.
+          sortKey: -1777479294480
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/guardians/{{ _.guardian_id }}"
+        name: Atualizar Responsável
+        meta:
+          id: req_d6c1685d743b47d983001f91c1aa4680
+          created: 1777479294483
+          modified: 1777479294483
+          isPrivate: false
+          description: Atualiza dados do responsável. student_ids substitui todos os
+            vínculos atuais.
+          sortKey: -1777479294483
+        method: PUT
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "Maria Oliveira Atualizada",
+              "phone": "11990012345",
+              "phone_secondary": "11977776666",
+              "email_secondary": "maria2@email.com",
+              "student_ids": [1, 2]
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/admin/guardians/{{ _.guardian_id }}"
+        name: Remover Responsável
+        meta:
+          id: req_a86ca1965a09439fbfda80e77676e1ea
+          created: 1777479294486
+          modified: 1777479294486
+          isPrivate: false
+          description: Remove o responsável e seus vínculos com alunos (CASCADE).
+          sortKey: -1777479294486
+        method: DELETE
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: 👤 Guardian — Área do Responsável
+    meta:
+      id: fld_95a5aab25ae0478092ac03e81789d8b1
+      created: 1777479294417
+      modified: 1777479294417
+      sortKey: -1777479294417
+      description: Endpoints do responsável (requer role=guardian)
+    children:
+      - url: "{{ _.base_url }}/guardian/messages"
+        name: Listar Minhas Mensagens
+        meta:
+          id: req_ecf921f386f741b5a1c0babfb4ad1f55
+          created: 1777479294489
+          modified: 1777479294489
+          isPrivate: false
+          description: Lista mensagens recebidas pelo responsável autenticado (mais
+            recentes primeiro). Inclui anexos com URL.
+          sortKey: -1777479294489
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_guardian }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/guardian/messages/{{ _.message_id }}"
+        name: Detalhe da Mensagem (marca como lida)
+        meta:
+          id: req_162bb31dddbf46a7bb1be6bddd59f084
+          created: 1777479294494
+          modified: 1777479294494
+          isPrivate: false
+          description: Retorna detalhe da mensagem e a marca como lida automaticamente. Só
+            acessa mensagens do próprio responsável.
+          sortKey: -1777479294494
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_guardian }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/guardian/profile"
+        name: Meu Perfil
+        meta:
+          id: req_c44043770e7c435d9230bea3454670c5
+          created: 1777479294497
+          modified: 1777479294497
+          isPrivate: false
+          description: Retorna dados do próprio perfil e alunos vinculados.
+          sortKey: -1777479294497
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_guardian }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/guardian/profile"
+        name: Atualizar Meu Perfil
+        meta:
+          id: req_2a7f7bc97bfe4fd0b12ce1c945f1f2a7
+          created: 1777479294500
+          modified: 1777479294500
+          isPrivate: false
+          description: "Responsável pode atualizar: name, phone, phone_secondary,
+            email_secondary."
+          sortKey: -1777479294500
+        method: PUT
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "name": "Maria Oliveira",
+              "phone": "11990012345",
+              "phone_secondary": "11977776666",
+              "email_secondary": "maria.pessoal@email.com"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: Authorization
+            value: Bearer {{ _.token_guardian }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/guardian/messages/9999"
+        name: ⚠ Mensagem de Outro Responsável — Deve retornar 404
+        meta:
+          id: req_c37ab33f675d48f992c371c45e951f2a
+          created: 1777479294519
+          modified: 1777479294519
+          isPrivate: false
+          description: Tenta acessar mensagem que não pertence ao responsável autenticado.
+            Deve retornar 404.
+          sortKey: -1777479294519
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_guardian }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: 📎 Arquivos Estáticos
+    meta:
+      id: fld_2c3fe60656404934becfd9702f3736e7
+      created: 1777479294419
+      modified: 1777479294419
+      sortKey: -1777479294419
+      description: Acesso a imagens e vídeos anexados (requer JWT)
+    children:
+      - url: http://localhost:3000/uploads/images/a89d100c-8fa5-4438-a597-78c4374ac1d7.jpg
+        name: Acessar Imagem
+        meta:
+          id: req_43d51a22f80042d29d8f6889088608c4
+          created: 1777479294503
+          modified: 1777480268291
+          isPrivate: false
+          description: Serve a imagem salva em uploads/images/. Requer JWT. Substitua
+            FILENAME pelo nome retornado nos anexos.
+          sortKey: -1777479294503
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: http://localhost:3000/uploads/videos/FILENAME.mp4
+        name: Acessar Vídeo
+        meta:
+          id: req_d2e8f4d70ea04ae89118b1cdb56a9540
+          created: 1777479294505
+          modified: 1777479294505
+          isPrivate: false
+          description: Serve o vídeo salvo em uploads/videos/. Requer JWT. Substitua
+            FILENAME pelo nome retornado nos anexos.
+          sortKey: -1777479294505
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {{ _.token_admin }}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_178cf48d6f7a4d18a701064db92db55b78b44657
+    created: 1777479294800
+    modified: 1777479294800
+environments:
+  name: Base Environment
+  meta:
+    id: env_402932e56a564bc8b3f9a41ae8a61f7b
+    created: 1777479294397
+    modified: 1777486569161
+    isPrivate: false
+  data:
+    base_url: http://localhost:3000/api
+    token_admin: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwibmFtZSI6IkRpcmV0b3IgQWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJmaXJzdF9hY2Nlc3MiOjAsImV4cCI6MTc3NzU3Mjk1NiwiaWF0IjoxNzc3NDg2NTU2fQ.sxp6yFdVwBc4N4eHzmvus0gZA0PdW-ZzlDP5wvMBwSQ
+    token_guardian: ""
+    student_id: 1
+    guardian_id: 1
+    message_id: 2

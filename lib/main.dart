@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'models/models.dart';
 import 'services/auth_provider.dart';
+import 'services/link_provider.dart';
 import 'utils/app_theme.dart';
 import 'screens/auth/role_selection_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
@@ -25,15 +25,19 @@ void main() async {
     statusBarIconBrightness: Brightness.light,
   ));
 
+  final themeProvider = ThemeProvider();
+  await themeProvider.init();
+
   runApp(
-  MultiProvider(
-    providers: [
-      ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
-      ChangeNotifierProvider(create: (_) => ThemeProvider()),
-    ],
-    child: const EscolaConectaApp(),
-  ),
-);
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
+        ChangeNotifierProvider(create: (_) => themeProvider),
+        ChangeNotifierProvider(create: (_) => LinkProvider()),
+      ],
+      child: const EscolaConectaApp(),
+    ),
+  );
 }
 
 class EscolaConectaApp extends StatelessWidget {
@@ -45,6 +49,7 @@ class EscolaConectaApp extends StatelessWidget {
   builder: (context, themeProvider, _) {
     return MaterialApp(
       title: 'EscolaConecta',
+      navigatorKey: AuthProvider.navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
@@ -77,8 +82,45 @@ class _SplashRouter extends StatelessWidget {
   }
 }
 
-class _SplashScreen extends StatelessWidget {
+class _SplashScreen extends StatefulWidget {
   const _SplashScreen();
+
+  @override
+  State<_SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<_SplashScreen> with TickerProviderStateMixin {
+  late AnimationController _logoController;
+  late Animation<double> _logoAnimation;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _logoController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    _logoAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _logoController, curve: Curves.elasticOut),
+    );
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    _logoController.forward();
+  }
+
+  @override
+  void dispose() {
+    _logoController.dispose();
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,26 +130,46 @@ class _SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(
-                    color: AppTheme.accentBlue.withOpacity(0.3), width: 2),
-              ),
-              child: const Icon(Icons.school_rounded,
-                  color: AppTheme.accentBlue, size: 50),
-                  
+            AnimatedBuilder(
+              animation: _logoAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _logoAnimation.value,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withOpacity(0.3),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.school_rounded,
+                        color: AppTheme.accentBlue, size: 50),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Escola Conecta',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold),
+            AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: const Text(
+                    'Escola Conecta',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 40),
             const CircularProgressIndicator(

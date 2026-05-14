@@ -18,17 +18,14 @@ class _ParentMessageDetailScreenState
   @override
   void initState() {
     super.initState();
-    // Mark as read
-    if (widget.message.isNew) {
-      ApiService().markMessageRead(widget.message.id).catchError((_) {});
-    }
+    // Message is marked as read automatically by backend on GET
   }
 
   @override
   Widget build(BuildContext context) {
     final m = widget.message;
     final dateStr = DateFormat("dd 'de' MMMM 'de' yyyy 'às' HH:mm", 'pt_BR')
-        .format(m.sentAt);
+        .format(m.sentAt ?? m.createdAt);
 
     return Scaffold(
       backgroundColor: AppTheme.darkBg,

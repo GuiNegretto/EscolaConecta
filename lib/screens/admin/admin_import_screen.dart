@@ -38,21 +38,23 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
     if (_filePath == null) return;
     setState(() => _uploading = true);
     try {
-      await _api.importSpreadsheet(_filePath!);
+      // TODO: Implement spreadsheet import when API endpoint is ready
+      await Future.delayed(const Duration(seconds: 1));
+      
       if (!mounted) return;
       setState(() {
         _success = true;
         _uploading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Planilha importada com sucesso!'),
-        backgroundColor: AppTheme.success,
+        content: Text('Importação de planilha: recurso em desenvolvimento'),
+        backgroundColor: AppTheme.warning,
       ));
-    } on ApiException catch (e) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _uploading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e.message),
+        content: Text('Erro: $e'),
         backgroundColor: AppTheme.danger,
       ));
     }

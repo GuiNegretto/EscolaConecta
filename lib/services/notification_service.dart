@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-import '../utils/app_theme.dart';
+import '../services/logging_http_client.dart';
+import '../utils/constants.dart';
 
 // ─── Handler de background (top-level obrigatório) ────────────────────────────
 @pragma('vm:entry-point')
@@ -33,6 +34,7 @@ class NotificationService {
 
   final _fcm = FirebaseMessaging.instance;
   final _localNotif = FlutterLocalNotificationsPlugin();
+  final http.Client _client = LoggingHttpClient();
 
   // Chave para contagem de notificações não lidas (badge)
   static const _badgeKey = 'notif_badge_count';
@@ -113,7 +115,7 @@ class NotificationService {
     if (authToken == null) return; // usuário não logado ainda
 
     try {
-      await http.post(
+      await _client.post(
         Uri.parse('${AppConstants.baseUrl}/notifications/token'),
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +145,7 @@ class NotificationService {
     if (authToken == null) return;
 
     try {
-      await http.delete(
+      await _client.delete(
         Uri.parse('${AppConstants.baseUrl}/notifications/token'),
         headers: {'Authorization': 'Bearer $authToken'},
       );

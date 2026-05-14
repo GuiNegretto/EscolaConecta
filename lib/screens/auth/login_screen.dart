@@ -5,6 +5,7 @@ import '../../../services/auth_provider.dart';
 import '../../../utils/app_theme.dart';
 import '../../../widgets/common_widgets.dart';
 import '../admin/admin_dashboard_screen.dart';
+import '../auth/change_password_screen.dart';
 import '../parent/parent_messages_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passCtrl = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
+  bool _remember = false;
 
   @override
   void dispose() {
@@ -38,13 +40,14 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailCtrl.text.trim(),
       _passCtrl.text,
       widget.role,
+      remember: _remember,
     );
 
     if (!mounted) return;
     setState(() => _loading = false);
 
     if (ok) {
-      final destination = widget.role == UserRole.admin
+      final destination = auth.isAdmin
           ? const AdminDashboardScreen()
           : const ParentMessagesScreen();
       Navigator.pushAndRemoveUntil(
@@ -124,6 +127,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             return null;
                           },
                         ),
+                        const SizedBox(height: 16),
+                        CheckboxListTile(
+                          title: const Text('Lembrar login'),
+                          value: _remember,
+                          onChanged: (value) => setState(() => _remember = value ?? false),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                        ),
                         const SizedBox(height: 24),
                         ElevatedButton(
                           onPressed: _loading ? null : _login,
@@ -133,7 +144,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         Center(
                           child: TextButton(
                             onPressed: () {
-                              // TODO: navegar para primeiro acesso
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ChangePasswordScreen(),
+                                ),
+                              );
                             },
                             child: const Text('Primeiro acesso',
                                 style: TextStyle(color: AppTheme.accentBlue)),
@@ -142,14 +158,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         Center(
                           child: TextButton(
                             onPressed: () {
-                              // TODO: recuperação de senha
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Recuperação de senha não disponível atualmente.'),
+                                ),
+                              );
                             },
                             child: Text('Esqueci minha senha',
-                                style: Theme.of(context).textTheme.bodyMedium,
+                                style: Theme.of(context).textTheme.bodyMedium),
                           ),
                         ),
-                    ),
-                    ],
+                      ],
                     ),
                   ),
                 ),
