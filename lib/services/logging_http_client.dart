@@ -10,11 +10,22 @@ class LoggingHttpClient extends http.BaseClient {
 
   LoggingHttpClient([http.Client? inner]) : _inner = inner ?? http.Client();
 
+
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (!kDebugMode) {
       return _inner.send(request);
     }
+
+// --- CORREÇÃO AQUI ---
+  if (request is http.MultipartRequest) {
+    // Se for multipart, JAMAIS pode ter application/json
+    request.headers.remove('Content-Type');
+    request.headers.remove('content-type');
+  } else if (!request.headers.containsKey('Content-Type')) {
+    // Só adiciona JSON se não for multipart e não tiver header definido
+    request.headers['Content-Type'] = 'application/json';
+  }
 
     final id = ++_requestId;
     final stopwatch = Stopwatch()..start();

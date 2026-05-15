@@ -17,7 +17,8 @@ class ParentMessagesScreen extends StatefulWidget {
   State<ParentMessagesScreen> createState() => _ParentMessagesScreenState();
 }
 
-class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
+class _ParentMessagesScreenState extends State<ParentMessagesScreen>
+  with AutomaticKeepAliveClientMixin {
   final _api = ApiService();
   late ScrollController _scrollController;
   List<Message> _messages = [];
@@ -61,6 +62,7 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final user = context.read<AuthProvider>().user;
 
     return Scaffold(
@@ -168,11 +170,13 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
                         onRefresh: _load,
                         color: AppTheme.accentBlue,
                         child: ListView.separated(
+                          key: const PageStorageKey('parent_messages_list'),
                           controller: _scrollController,
                           itemCount: _filtered.length,
                           separatorBuilder: (_, __) =>
                               Divider(height: 1, color: Theme.of(context).dividerColor),
                           itemBuilder: (_, i) => MessageCard(
+                            key: ValueKey(_filtered[i].id),
                             message: _filtered[i],
                             onTap: () => Navigator.push(
                               context,
@@ -190,6 +194,9 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen> {
       ),
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 
   Widget _buildDrawer(BuildContext context, User? user) {
     return Drawer(

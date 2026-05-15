@@ -187,13 +187,33 @@ class AdminMessageListCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        message.title,
+                      Row(
+                        children: [
+                          Text(
+                            message.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (message.status == MessageStatus.draft)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                children: const [
+                                  Icon(Icons.edit, size: 12, color: Colors.grey),
+                                  SizedBox(width: 4),
+                                  Text('Rascunho', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(

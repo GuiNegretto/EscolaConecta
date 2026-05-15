@@ -103,6 +103,14 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
     return true;
   }
 
+  bool _validateSchedule() {
+    if (_isScheduled && _scheduledTime == null) {
+      _showError('Selecione a data e hora para o agendamento');
+      return false;
+    }
+    return true;
+  }
+
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: AppTheme.danger),
@@ -116,8 +124,28 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
 
     setState(() => _saving = true);
     try {
-      // TODO: Implementar salvar rascunho via API
-      await Future.delayed(const Duration(milliseconds: 500));
+      final selectedType = _selectedType;
+      if (selectedType == null) {
+        _showError('Selecione o tipo de envio');
+        return;
+      }
+      final req = SendMessageRequest(
+        title: _titleCtrl.text.trim(),
+        content: _contentCtrl.text.trim(),
+        type: selectedType,
+        targetClass: _targetClass == 'Todas as turmas' ? null : _targetClass,
+        isDraft: true,
+        scheduledAt: _isScheduled ? _scheduledTime : null,
+      );
+      debugPrint('saveDraft payload: ${req.toJson()}');
+
+      final editingMessage = _editingMessage;
+      if (editingMessage != null) {
+        await _api.updateMessage(editingMessage.id, req);
+      } else {
+        await _api.createMessage(req);
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -175,36 +203,177 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
     });
   }
 
-  // ── Enviar (ou Agendar) ──────────────────────────────────────────────────
-
-  Future<void> _sendOrSchedule() async {
+  // ── Salvar Rascunho (Passo Final) ────────────────────────────────────────
+  Future<void> _saveDraftOnly() async {
     setState(() => _saving = true);
     try {
-      // TODO: Implementar envio/agendamento via API
-      // final request = SendMessageRequest(
-      //   title: _titleCtrl.text.trim(),
-      //   content: _contentCtrl.text.trim(),
-      //   type: _selectedType!,
-      //   targetClass: _targetClass == 'Todas as turmas' ? null : _targetClass,
-      // );
-      // await _api.sendMessage(request);
-      // Se _scheduledTime != null, agendar para depois
-      // Se _scheduledTime == null, enviar imediatamente (com confirmação)
+      if (!_validateStep1()) return;
 
-      await Future.delayed(const Duration(milliseconds: 500));
+      final selectedType = _selectedType;
+      if (selectedType == null) {
+        _showError('Selecione o tipo de envio');
+        return;
+      }
+
+      final title = _titleCtrl.text.trim();
+      final content = _contentCtrl.text.trim();
+      final targetClass = _targetClass == 'Todas as turmas' ? null : _targetClass;
+      final scheduledAt = _isScheduled ? _scheduledTime : null;
+
+      final req = SendMessageRequest(
+        title: title,
+        content: content,
+        type: selectedType,
+        targetClass: targetClass,
+        isDraft: true,
+        scheduledAt: scheduledAt,
+      );
+      debugPrint('saveDraftOnly payload: ${req.toJson()}');
+
+      final editingMessage = _editingMessage;
+      if (editingMessage != null) {
+        await _api.updateMessage(editingMessage.id, req);
+      } else {
+        await _api.createMessage(req);
+      }
 
       if (mounted) {
-        final action = _isScheduled ? 'agendada' : 'enviada';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Mensagem $action com sucesso!'),
+          const SnackBar(
+            content: Text('Rascunho salvo com sucesso!'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      _showError('Erro ao salvar: $e');
+    } finally {
+      setState(() => _saving = false);
+    }
+  }
+
+  // ── Enviar Agora (com confirmação) ────────────────────────────────────────
+  Future<void> _sendNow() async {
+    setState(() => _saving = true);
+    try {
+      if (!_validateStep1()) return;
+
+      final selectedType = _selectedType;
+      if (selectedType == null) {
+        _showError('Selecione o tipo de envio');
+        return;
+      }
+
+      final title = _titleCtrl.text.trim();
+      final content = _contentCtrl.text.trim();
+      final targetClass = _targetClass == 'Todas as turmas' ? null : _targetClass;
+
+      final req = SendMessageRequest(
+        title: title,
+        content: content,
+        type: selectedType,
+        targetClass: targetClass,
+        isDraft: false,
+        scheduledAt: null,
+      );
+      debugPrint('sendNow payload: ${req.toJson()}');
+
+      // Confirm final send
+      if (!mounted) return;
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Enviar Mensagem Definitivamente?'),
+          content: const Text('Esta ação não poderá ser desfeita. Deseja continuar?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Enviar'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+
+      // Save (create/update) first to get an ID, then call send endpoint
+      Message saved;
+      final editingMessage = _editingMessage;
+      if (editingMessage != null) {
+        saved = await _api.updateMessage(editingMessage.id, req);
+      } else {
+        saved = await _api.createMessage(req);
+      }
+
+      await _api.sendDraft(saved.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mensagem enviada com sucesso!'),
             backgroundColor: Colors.green,
           ),
         );
         Navigator.pop(context);
       }
     } catch (e) {
-      _showError('Erro: $e');
+      _showError('Erro ao enviar: $e');
+    } finally {
+      setState(() => _saving = false);
+    }
+  }
+
+  // ── Agendar Mensagem ──────────────────────────────────────────────────────
+  Future<void> _scheduleMessage() async {
+    setState(() => _saving = true);
+    try {
+      if (!_validateStep1() || !_validateSchedule()) return;
+
+      final selectedType = _selectedType;
+      if (selectedType == null) {
+        _showError('Selecione o tipo de envio');
+        return;
+      }
+
+      final title = _titleCtrl.text.trim();
+      final content = _contentCtrl.text.trim();
+      final targetClass = _targetClass == 'Todas as turmas' ? null : _targetClass;
+      final scheduledAt = _scheduledTime;
+
+      final req = SendMessageRequest(
+        title: title,
+        content: content,
+        type: selectedType,
+        targetClass: targetClass,
+        isDraft: false,
+        scheduledAt: scheduledAt,
+      );
+      debugPrint('scheduleMessage payload: ${req.toJson()}');
+
+      // Create or update with schedule (server will handle scheduling)
+      final editingMessage = _editingMessage;
+      if (editingMessage != null) {
+        await _api.updateMessage(editingMessage.id, req);
+      } else {
+        await _api.createMessage(req);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mensagem agendada com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      _showError('Erro ao agendar: $e');
     } finally {
       setState(() => _saving = false);
     }
@@ -845,58 +1014,100 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         ),
         padding: const EdgeInsets.all(16),
         child: SafeArea(
-          child: Row(
-            children: [
-              // ─── Botão Voltar ───────────────────────────────────
-              if (_currentStep > 0)
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed:
-                        _saving ? null : () => setState(() => _currentStep--),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey,
-                      foregroundColor: Colors.white,
+          child: _currentStep == 2
+              ? Row(
+                  children: [
+                    // ─── Voltar ───────────────────────────────────
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _saving ? null : () => setState(() => _currentStep--),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('← Voltar'),
+                      ),
                     ),
-                    child: const Text('← Voltar'),
-                  ),
-                )
-              else
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _saving ? null : () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey,
-                    ),
-                    child: const Text('Cancelar'),
-                  ),
-                ),
-              const SizedBox(width: 12),
+                    const SizedBox(width: 12),
 
-              // ─── Botão Próximo/Enviar ───────────────────────────
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: _saving
-                      ? null
-                      : _currentStep == 0
-                          ? _nextToReview
-                          : _currentStep == 1
-                              ? _nextToSchedule
-                              : _sendOrSchedule,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryBlue,
-                  ),
-                  child: Text(_currentStep == 0
-                      ? 'Revisar →'
-                      : _currentStep == 1
-                          ? 'Próximo →'
-                          : _isScheduled
-                              ? 'Agendar Envio'
-                              : 'Enviar Agora'),
+                    // ─── Salvar Rascunho ───────────────────────────
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _saving ? null : _saveDraftOnly,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade600,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('💾 Salvar Rascunho'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // ─── Enviar/Agendar ────────────────────────────
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: _saving
+                            ? null
+                            : _isScheduled
+                                ? _scheduleMessage
+                                : _sendNow,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryBlue,
+                        ),
+                        child: Text(
+                          _isScheduled ? '📅 Agendar Envio' : '✈️ Enviar Agora',
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    // ─── Botão Voltar/Cancelar ───────────────────────────────────
+                    if (_currentStep > 0)
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed:
+                              _saving ? null : () => setState(() => _currentStep--),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('← Voltar'),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _saving ? null : () => Navigator.pop(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey,
+                          ),
+                          child: const Text('Cancelar'),
+                        ),
+                      ),
+                    const SizedBox(width: 12),
+
+                    // ─── Botão Próximo ───────────────────────────
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: _saving
+                            ? null
+                            : _currentStep == 0
+                                ? _nextToReview
+                                : _nextToSchedule,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryBlue,
+                        ),
+                        child: Text(
+                          _currentStep == 0 ? 'Revisar →' : 'Próximo →',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

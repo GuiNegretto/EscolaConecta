@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../services/logging_http_client.dart';
 import '../utils/constants.dart';
@@ -17,6 +18,12 @@ class ApiException implements Exception {
 
 class AuthExpiredException extends ApiException {
   const AuthExpiredException() : super('Sessão expirada', statusCode: 401);
+}
+
+// Parse JSON in a background isolate to avoid blocking the UI thread.
+dynamic _parseJson(String text) {
+  if (text.trim().isEmpty) return {};
+  return jsonDecode(text);
 }
 
 class ApiService {
@@ -71,7 +78,7 @@ class ApiService {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
     final res = await _client.get(uri, headers: _headers)
         .timeout(const Duration(seconds: 15));
-    return _handleResponse(res);
+    return await _handleResponse(res);
   }
 
   Future<dynamic> _post(String path, Map<String, dynamic> body) async {
@@ -80,7 +87,7 @@ class ApiService {
     final res = await _client
         .post(uri, headers: _headers, body: jsonEncode(body))
         .timeout(const Duration(seconds: 15));
-    return _handleResponse(res);
+    return await _handleResponse(res);
   }
 
   Future<dynamic> _put(String path, Map<String, dynamic> body) async {
@@ -89,7 +96,7 @@ class ApiService {
     final res = await _client
         .put(uri, headers: _headers, body: jsonEncode(body))
         .timeout(const Duration(seconds: 15));
-    return _handleResponse(res);
+    return await _handleResponse(res);
   }
 
   Future<dynamic> _delete(String path) async {
@@ -98,30 +105,50 @@ class ApiService {
     final res = await _client
         .delete(uri, headers: _headers)
         .timeout(const Duration(seconds: 15));
-    return _handleResponse(res);
+    return await _handleResponse(res);
   }
 
-  dynamic _handleResponse(http.Response res) {
+  Future<dynamic> _handleResponse(http.Response res) async {
     final body = utf8.decode(res.bodyBytes);
+
+    // Only attempt to process body for success codes
     if (res.statusCode >= 200 && res.statusCode < 300) {
       if (body.isEmpty) return {};
-      final json = jsonDecode(body);
-      if (json is Map<String, dynamic> && json.containsKey('success') && json.containsKey('data')) {
-        return json['data'];
+      try {
+        final parsed = await compute(_parseJson, body);
+        if (parsed == null) return {};
+
+        if (parsed is Map<String, dynamic> && parsed.containsKey('success') && parsed.containsKey('data')) {
+          final data = parsed['data'];
+          if (data == null) return {};
+          return data;
+        }
+
+        // If parsed is a Map or List, return as-is. Otherwise, return parsed.
+        return parsed;
+      } catch (e) {
+        throw ApiException('Erro ao processar resposta: ${e.toString()}', statusCode: res.statusCode);
       }
-      return json;
     }
+
+    // Handle unauthorized separately
     if (res.statusCode == 401) {
-      // Sessão expirada
       clearToken();
       AuthProvider.onSessionExpired?.call();
       throw AuthExpiredException();
     }
-    final json = jsonDecode(body);
-    throw ApiException(
-      json['message'] ?? 'Erro desconhecido',
-      statusCode: res.statusCode,
-    );
+
+    // For error responses try to parse a message, but don't crash if parsing fails
+    try {
+      final parsed = await compute(_parseJson, body);
+      if (parsed is Map && parsed['message'] != null) {
+        throw ApiException(parsed['message'].toString(), statusCode: res.statusCode);
+      }
+    } catch (_) {
+      // ignore parsing errors for error bodies
+    }
+
+    throw ApiException('Erro desconhecido', statusCode: res.statusCode);
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -190,7 +217,8 @@ class ApiService {
 
   Future<List<Message>> getMessages() async {
     final data = await _get(AppConstants.messagesEndpoint);
-    return (data as List).map((e) => Message.fromJson(e)).toList();
+    final list = (data is List) ? data : <dynamic>[];
+    return list.map((e) => Message.fromJson(e)).toList();
   }
 
   Future<List<Message>> getAdminMessages({String? type, String? className}) async {
@@ -203,7 +231,8 @@ class ApiService {
         : AppConstants.adminMessagesEndpoint;
 
     final data = await _get(path);
-    return (data as List).map((e) => Message.fromJson(e)).toList();
+    final list = (data is List) ? data : <dynamic>[];
+    return list.map((e) => Message.fromJson(e)).toList();
   }
 
   Future<Message> getMessage(String id) async {
@@ -223,7 +252,8 @@ class ApiService {
       ..headers.addAll(_authHeaders)
       ..fields['title'] = req.title
       ..fields['body'] = req.content
-      ..fields['type'] = req.type;
+      ..fields['type'] = req.type
+      ..fields['is_draft'] = req.isDraft ? '1' : '0';
 
     if (req.targetClass != null) {
       final parts = req.targetClass!.split(' - ');
@@ -245,7 +275,64 @@ class ApiService {
 
     final streamed = await _client.send(reqMultipart);
     final res = await http.Response.fromStream(streamed);
-    _handleResponse(res);
+    await _handleResponse(res);
+  }
+
+  Future<Message> createMessage(SendMessageRequest req, {List<String>? filePaths}) async {
+    await _ensureTokenLoaded();
+    // If there are files, use multipart; otherwise send JSON
+    if (filePaths != null && filePaths.isNotEmpty) {
+      final uri = Uri.parse('${AppConstants.baseUrl}${AppConstants.adminMessagesEndpoint}');
+      final reqMultipart = http.MultipartRequest('POST', uri)
+        ..headers.addAll(_authHeaders)
+        ..headers.remove('Content-Type'); // Remova SEMPRE o Content-Type
+
+        reqMultipart.fields['title'] = req.title;
+        reqMultipart.fields['body'] = req.content ?? '';
+        reqMultipart.fields['type'] = req.type;
+        reqMultipart.fields['is_draft'] = req.isDraft ? '1' : '0';
+
+      for (final path in filePaths) {
+        reqMultipart.files.add(await http.MultipartFile.fromPath('files[]', path));
+      }
+
+      final streamed = await _client.send(reqMultipart);
+      final res = await http.Response.fromStream(streamed);
+      final data = await _handleResponse(res);
+      return Message.fromJson(data as Map<String, dynamic>);
+    }
+
+    final data = await _post(AppConstants.adminMessagesEndpoint, req.toJson());
+    return Message.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<Message> updateMessage(String id, SendMessageRequest req, {List<String>? filePaths}) async {
+    await _ensureTokenLoaded();
+    final path = '${AppConstants.adminMessagesEndpoint}/$id';
+    if (filePaths != null && filePaths.isNotEmpty) {
+      final uri = Uri.parse('${AppConstants.baseUrl}$path');
+      final reqMultipart = http.MultipartRequest('PUT', uri)
+        ..headers.addAll(_authHeaders)
+        ..fields.addAll(req.toJson().map((k, v) => MapEntry(k, v is List ? jsonEncode(v) : v.toString())));
+
+      for (final path in filePaths) {
+        reqMultipart.files.add(await http.MultipartFile.fromPath('files[]', path));
+      }
+
+      final streamed = await _client.send(reqMultipart);
+      final res = await http.Response.fromStream(streamed);
+      final data = await _handleResponse(res);
+      return Message.fromJson(data as Map<String, dynamic>);
+    }
+
+    final data = await _put(path, req.toJson());
+    return Message.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> sendDraft(String id) async {
+    await _ensureTokenLoaded();
+    final path = '${AppConstants.adminMessagesEndpoint}/$id/send';
+    await _put(path, {});
   }
 
   // ── Students ──────────────────────────────────────────────────────────────
@@ -259,7 +346,8 @@ class ApiService {
         : AppConstants.studentsEndpoint;
 
     final data = await _get(path);
-    return (data as List).map((e) => Student.fromJson(e)).toList();
+    final list = (data is List) ? data : <dynamic>[];
+    return list.map((e) => Student.fromJson(e)).toList();
   }
 
   Future<Student> createStudent(Student student) async {
@@ -280,7 +368,8 @@ class ApiService {
 
   Future<List<Parent>> listParents() async {
     final data = await _get(AppConstants.parentsEndpoint);
-    return (data as List).map((e) => Parent.fromJson(e)).toList();
+    final list = (data is List) ? data : <dynamic>[];
+    return list.map((e) => Parent.fromJson(e)).toList();
   }
 
   Future<Parent> createParent(Parent parent) async {
@@ -300,7 +389,8 @@ class ApiService {
   // ── Dashboard stats (admin) ───────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getDashboardStats() async {
-    return await _get('/dashboard/stats');
+    final data = await _get('/dashboard/stats');
+    return (data is Map<String, dynamic>) ? data : <String, dynamic>{};
   }
 
   // ── Student-Parent Links (Vínculos) ─────────────────────────────────────────
@@ -347,7 +437,7 @@ class ApiService {
 
     // Adicionar o studentId se não estiver presente
     if (!parentObj.studentIds.contains(studentId)) {
-      final updatedStudentIds = [...parentObj.studentIds, studentId];
+      final updatedStudentIds = [...parentObj.studentIds.map((id) => int.parse(id)), (int.parse(studentId))];
 
       // Atualizar o responsável com o novo vínculo
       await updateParent(parentId, {

@@ -21,7 +21,7 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen>
-    with SingleTickerProviderStateMixin {
+  with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   final _api = ApiService();
   late ScrollController _scrollController;
   List<Message> _allMessages = [];
@@ -128,6 +128,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final user = context.read<AuthProvider>().user;
     final stats = _getStats();
     final filteredMessages = _getFilteredMessages();
@@ -178,10 +179,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 child: CircularProgressIndicator(color: AppTheme.accentBlue),
               )
             : SingleChildScrollView(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
+              key: const PageStorageKey('admin_dashboard_scroll'),
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ─── AÇÕES RÁPIDAS ──────────────────────────────────────
@@ -200,6 +202,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       ),
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 
   Widget _buildSummarySection(BuildContext context, Map<String, int> stats) {
     return Column(
@@ -355,6 +360,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   Widget _buildCommunicationCenter(
       BuildContext context, List<Message> messages) {
+    final drafts = messages.where((m) => m.status == MessageStatus.draft).toList();
+    final sent = messages.where((m) => m.status == MessageStatus.sent).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -384,111 +392,78 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         ),
         const SizedBox(height: 12),
 
-        // ─── FILTROS ─────────────────────────────────────────────────
-        MessageStatusFilter(
-          selected: _selectedFilter,
-          filters: _statusFilters,
-          onChanged: (filter) => setState(() => _selectedFilter = filter),
+        // Tabs: Rascunhos / Enviadas
+        TabBar(
+          controller: _tabController,
+          labelColor: AppTheme.primaryBlue,
+          unselectedLabelColor: Colors.grey,
+          tabs: const [
+            Tab(text: 'Rascunhos'),
+            Tab(text: 'Enviadas'),
+          ],
         ),
         const SizedBox(height: 12),
 
-        // ─── LISTA DE MENSAGENS ──────────────────────────────────────
-        if (messages.isEmpty)
-          SizedBox(
-            height: 300,
-            child: CommunicationEmptyState(
-              title: 'Nenhuma mensagem',
-              subtitle: 'Comece criando uma nova mensagem para se comunicar',
-              icon: Icons.inbox_outlined,
-              onAction: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const AdminSendMessageScreen()),
-              ).then((_) => _load()),
-              actionLabel: 'Criar Mensagem',
-            ),
-          )
-        else
-          Column(
-            children: messages.map((msg) {
-              return AdminMessageListCard(
-                message: msg,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        AdminMessageDetailScreen(messageId: msg.id),
-                  ),
-                ).then((_) => _load()),
-                onEdit: msg.canEdit
-                    ? () => Navigator.push(
+        SizedBox(
+          height: 400,
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // Rascunhos
+              drafts.isEmpty
+                  ? CommunicationEmptyState(
+                      title: 'Nenhum rascunho',
+                      subtitle: 'Crie um rascunho para salvar seu progresso',
+                      icon: Icons.edit,
+                      onAction: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AdminSendMessageScreen()),
+                      ).then((_) => _load()),
+                      actionLabel: 'Criar Rascunho',
+                    )
+                  : ListView.builder(
+                      itemCount: drafts.length,
+                      itemBuilder: (_, i) => AdminMessageListCard(
+                        key: ValueKey(drafts[i].id),
+                        message: drafts[i],
+                        onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => AdminSendMessageScreen(
-                              messageId: msg.id,
-                            ),
+                            builder: (_) => AdminMessageDetailScreen(messageId: drafts[i].id),
                           ),
-                        ).then((_) => _load())
-                    : null,
-                onSend: msg.canSend
-                    ? () async {
-                        // TODO: Implementar envio
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Enviar Mensagem?'),
-                            content: Text(
-                              'Enviar "${msg.title}" agora?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: const Text('Cancelar'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () async {
-                                  Navigator.pop(ctx);
-                                  // Implementar lógica de envio
-                                  _load();
-                                },
-                                child: const Text('Enviar'),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                    : null,
-                onDelete: () async {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Deletar Mensagem?'),
-                      content: Text(
-                        'Esta ação não pode ser desfeita.',
+                        ).then((_) => _load()),
+                        onEdit: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => AdminSendMessageScreen(messageId: drafts[i].id)),
+                        ).then((_) => _load()),
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancelar'),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          onPressed: () async {
-                            Navigator.pop(ctx);
-                            // TODO: Implementar delete
-                            _load();
-                          },
-                          child: const Text('Deletar'),
-                        ),
-                      ],
                     ),
-                  );
-                },
-              );
-            }).toList(),
+
+              // Enviadas
+              sent.isEmpty
+                  ? CommunicationEmptyState(
+                      title: 'Nenhuma mensagem enviada',
+                      subtitle: 'Mensagens enviadas aparecerão aqui',
+                      icon: Icons.send,
+                      onAction: () {},
+                      actionLabel: '—',
+                    )
+                  : ListView.builder(
+                      itemCount: sent.length,
+                      itemBuilder: (_, i) => AdminMessageListCard(
+                        key: ValueKey(sent[i].id),
+                        message: sent[i],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AdminMessageDetailScreen(messageId: sent[i].id),
+                          ),
+                        ).then((_) => _load()),
+                      ),
+                    ),
+            ],
           ),
+        ),
       ],
     );
   }

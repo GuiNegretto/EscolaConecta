@@ -296,6 +296,8 @@ class SendMessageRequest {
   final String type;
   final String? targetClass; // "3º Ano - A"
   final String? targetParentId;
+  final bool isDraft;
+  final DateTime? scheduledAt;
 
   const SendMessageRequest({
     required this.title,
@@ -303,7 +305,19 @@ class SendMessageRequest {
     required this.type,
     this.targetClass,
     this.targetParentId,
+    this.isDraft = false,
+    this.scheduledAt,
   });
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'body': content,
+        'type': type,
+        if (targetClass != null) 'class': targetClass,
+        if (targetParentId != null) 'guardian_ids': [targetParentId],
+        'is_draft': isDraft,
+        if (scheduledAt != null) 'scheduled_at': scheduledAt!.toUtc().toIso8601String(),
+      };
 }
 
 // ─── Student-Parent Link (Vínculo Aluno-Responsável) ─────────────────────────

@@ -91,29 +91,28 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(ctx);
-              setState(() => _sending = true);
-              try {
-                // TODO: Implementar envio via API
-                await Future.delayed(const Duration(seconds: 1));
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Mensagem enviada com sucesso!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  Navigator.pop(context);
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro ao enviar: $e')),
-                  );
-                }
-              } finally {
-                setState(() => _sending = false);
-              }
+                  Navigator.pop(ctx);
+                  setState(() => _sending = true);
+                  try {
+                    await _api.sendDraft(_message!.id);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Mensagem enviada com sucesso!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                      Navigator.pop(context);
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Erro ao enviar: $e')),
+                      );
+                    }
+                  } finally {
+                    setState(() => _sending = false);
+                  }
             },
             child: const Text('Enviar'),
           ),

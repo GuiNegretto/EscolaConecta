@@ -3,8 +3,8 @@ import 'api_routes.dart';
 class AppConstants {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    //defaultValue: 'http://localhost:3000/api',
-    defaultValue: 'https://escolaconecta-api-gfos.onrender.com/api',
+    defaultValue: 'http://localhost:3000/api',
+    //defaultValue: 'https://escolaconecta-api-gfos.onrender.com/api',
   );
 
   // Endpoints
