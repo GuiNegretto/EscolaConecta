@@ -281,7 +281,7 @@ class ApiService {
   Future<Message> createMessage(SendMessageRequest req, {List<String>? filePaths}) async {
     await _ensureTokenLoaded();
     // If there are files, use multipart; otherwise send JSON
-    if (filePaths != null && filePaths.isNotEmpty) {
+    //if (filePaths != null && filePaths.isNotEmpty) {
       final uri = Uri.parse('${AppConstants.baseUrl}${AppConstants.adminMessagesEndpoint}');
       final reqMultipart = http.MultipartRequest('POST', uri)
         ..headers.addAll(_authHeaders)
@@ -292,18 +292,20 @@ class ApiService {
         reqMultipart.fields['type'] = req.type;
         reqMultipart.fields['is_draft'] = req.isDraft ? '1' : '0';
 
+      if (filePaths != null && filePaths.isNotEmpty) {
       for (final path in filePaths) {
         reqMultipart.files.add(await http.MultipartFile.fromPath('files[]', path));
+      }
       }
 
       final streamed = await _client.send(reqMultipart);
       final res = await http.Response.fromStream(streamed);
       final data = await _handleResponse(res);
       return Message.fromJson(data as Map<String, dynamic>);
-    }
+    //}
 
-    final data = await _post(AppConstants.adminMessagesEndpoint, req.toJson());
-    return Message.fromJson(data as Map<String, dynamic>);
+    //final data = await _post(AppConstants.adminMessagesEndpoint, req.toJson());
+    //return Message.fromJson(data as Map<String, dynamic>);
   }
 
   Future<Message> updateMessage(String id, SendMessageRequest req, {List<String>? filePaths}) async {

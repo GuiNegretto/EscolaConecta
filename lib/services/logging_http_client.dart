@@ -59,6 +59,7 @@ class LoggingHttpClient extends http.BaseClient {
     final buffer = StringBuffer();
     buffer.writeln('════════════════════════════════════════════════════════════════════════');
     buffer.writeln('📤 [REQUEST] #$id');
+    buffer.writeln('Type: ${request.runtimeType}'); // <--- ADICIONE ESTA LINHA
     buffer.writeln('${request.method} ${request.url}');
 
     if (request.url.queryParameters.isNotEmpty) {
@@ -112,6 +113,11 @@ class LoggingHttpClient extends http.BaseClient {
   }
 
   String _extractRequestBody(http.BaseRequest request) {
+    if (request is http.MultipartRequest) {
+    // Se for Multipart, o corpo NÃO É JSON.
+    return '--- MULTIPART DATA ---\nFields: ${request.fields}\nFiles: ${request.files.map((f) => f.filename).toList()}';
+  }
+  
     if (request is http.Request) {
       if (request.body.isEmpty) return '';
       return _sanitizeBody(request.body);
