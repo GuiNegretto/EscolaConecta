@@ -1,3 +1,4 @@
+
 // ─── User / Auth ───────────────────────────────────────────────────────────
 
 enum UserRole { admin, parent }
@@ -131,7 +132,7 @@ class Message {
       sentAt: rawSentAt != null ? DateTime.tryParse(rawSentAt.toString()) : null,
       isNew: !(json['read'] == true),
       type: _parseType(json['type']?.toString()),
-      status: _parseStatus(json['status']?.toString()),
+      status: _parseStatusFromDraft(json['is_draft'], json['status']?.toString()),
       className: json['className'] ?? json['class_name'],
       parentName: json['parentName'] ?? json['parent_name'],
       recipientCount: json['recipient_count'] as int?,
@@ -151,24 +152,25 @@ class Message {
     }
   }
 
-  static MessageStatus _parseStatus(String? status) {
+  static MessageStatus _parseStatusFromDraft(dynamic isDraft, String? status) {
+    // Prioridade para o campo is_draft que vem do banco Go
+    if (isDraft != null) {
+      final boolDraft = isDraft == true || isDraft == 1 || isDraft == "1";
+      if (!boolDraft) {
+        return MessageStatus.sent; // Se não é rascunho, consideramos enviada
+      }
+    }
+
+    // Fallback para o campo status se existir
     switch (status?.toLowerCase()) {
       case 'draft':
         return MessageStatus.draft;
       case 'scheduled':
         return MessageStatus.scheduled;
-      case 'pending':
-        return MessageStatus.pending;
-      case 'sending':
-        return MessageStatus.sending;
       case 'sent':
         return MessageStatus.sent;
-      case 'cancelled':
-        return MessageStatus.cancelled;
-      case 'failed':
-        return MessageStatus.failed;
       default:
-        return MessageStatus.draft;
+        return (isDraft == false || isDraft == 0) ? MessageStatus.sent : MessageStatus.draft;
     }
   }
 
@@ -252,6 +254,7 @@ class Parent {
   final String? emailSecondary;
   final String? cpf;
   final List<String> studentIds;
+  final List<Student> students;
 
   const Parent({
     required this.id,
@@ -262,9 +265,15 @@ class Parent {
     this.emailSecondary,
     this.cpf,
     required this.studentIds,
+    this.students = const [],
   });
 
   factory Parent.fromJson(Map<String, dynamic> json) {
+    final studentsList = (json['students'] as List<dynamic>?)
+            ?.map((s) => Student.fromJson(s))
+            .toList() ??
+        [];
+
     return Parent(
       id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
@@ -273,7 +282,10 @@ class Parent {
       email: json['email'] ?? '',
       emailSecondary: json['emailSecondary'] ?? json['email_secondary'],
       cpf: json['cpf'],
-      studentIds: List<String>.from(json['studentIds'] ?? json['student_ids'] ?? []),
+      studentIds: studentsList.isNotEmpty
+          ? studentsList.map((s) => s.id).toList()
+          : List<String>.from(json['studentIds'] ?? json['student_ids'] ?? []),
+      students: studentsList,
     );
   }
 

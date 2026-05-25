@@ -30,6 +30,10 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
 
   Message? _editingMessage;
   bool _loading = false;
+  
+  // Turmas carregadas dinamicamente do back-end
+  List<String> _classes = [];
+  bool _loadingClasses = false;
 
   final _types = [
     ('Geral', 'geral'),
@@ -37,21 +41,39 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
     ('Individual', 'individual'),
   ];
 
-  final _classes = [
-    'Todas as turmas',
-    '1º Ano - A',
-    '1º Ano - B',
-    '2º Ano - A',
-    '2º Ano - B',
-    '3º Ano - A',
-    '3º Ano - B',
-  ];
-
   @override
   void initState() {
     super.initState();
+    _loadClasses();
     if (widget.messageId != null) {
       _loadMessage();
+    }
+  }
+
+  // ── Carregar lista de turmas do back-end ─────────────────────────────────
+  Future<void> _loadClasses() async {
+    setState(() => _loadingClasses = true);
+    try {
+      final students = await _api.getStudents();
+      // Extrair turmas únicas dos alunos
+      final uniqueClasses = <String>{
+        'Todas as turmas',
+        ...students.map((s) => s.fullClass),
+      };
+      setState(() {
+        _classes = uniqueClasses.toList()..sort((a, b) {
+          if (a == 'Todas as turmas') return -1;
+          return a.compareTo(b);
+        });
+        _loadingClasses = false;
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar turmas: $e');
+      setState(() {
+        _loadingClasses = false;
+        // Fallback: manter apenas "Todas as turmas" se falhar
+        _classes = ['Todas as turmas'];
+      });
     }
   }
 
@@ -63,7 +85,15 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         _editingMessage = msg;
         _titleCtrl.text = msg.title;
         _contentCtrl.text = msg.content;
-        _selectedType = msg.type.toString().split('.').last;
+        
+        // Correção do parsing do tipo para evitar null ou erro de split
+        final typeStr = msg.type.toString();
+        if (typeStr.contains('.')) {
+          _selectedType = typeStr.split('.').last;
+        } else {
+          _selectedType = typeStr;
+        }
+        
         _targetClass = msg.className ?? 'Todas as turmas';
         _scheduledTime = msg.scheduledAt;
         _isScheduled = msg.scheduledAt != null;
@@ -125,15 +155,31 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
     setState(() => _saving = true);
     try {
       final selectedType = _selectedType;
-      if (selectedType == null) {
+      if (selectedType == null || selectedType.isEmpty) {
         _showError('Selecione o tipo de envio');
         return;
       }
+
+      final title = _titleCtrl.text.trim();
+      final content = _contentCtrl.text.trim();
+
+      // Validate required fields are not empty
+      if (title.isEmpty) {
+        _showError('O título não pode estar vazio');
+        return;
+      }
+      if (content.isEmpty) {
+        _showError('O conteúdo não pode estar vazio');
+        return;
+      }
+
       final req = SendMessageRequest(
-        title: _titleCtrl.text.trim(),
-        content: _contentCtrl.text.trim(),
+        title: title,
+        content: content,
         type: selectedType,
-        targetClass: _targetClass == 'Todas as turmas' ? null : _targetClass,
+        targetClass: _targetClass == 'Todas as turmas' || _targetClass == null 
+            ? null 
+            : _targetClass,
         isDraft: true,
         scheduledAt: _isScheduled ? _scheduledTime : null,
       );
@@ -210,14 +256,27 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       if (!_validateStep1()) return;
 
       final selectedType = _selectedType;
-      if (selectedType == null) {
+      if (selectedType == null || selectedType.isEmpty) {
         _showError('Selecione o tipo de envio');
         return;
       }
 
       final title = _titleCtrl.text.trim();
       final content = _contentCtrl.text.trim();
-      final targetClass = _targetClass == 'Todas as turmas' ? null : _targetClass;
+
+      // Validate required fields are not empty
+      if (title.isEmpty) {
+        _showError('O título não pode estar vazio');
+        return;
+      }
+      if (content.isEmpty) {
+        _showError('O conteúdo não pode estar vazio');
+        return;
+      }
+
+      final targetClass = _targetClass == 'Todas as turmas' || _targetClass == null 
+          ? null 
+          : _targetClass;
       final scheduledAt = _isScheduled ? _scheduledTime : null;
 
       final req = SendMessageRequest(
@@ -260,14 +319,27 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       if (!_validateStep1()) return;
 
       final selectedType = _selectedType;
-      if (selectedType == null) {
+      if (selectedType == null || selectedType.isEmpty) {
         _showError('Selecione o tipo de envio');
         return;
       }
 
       final title = _titleCtrl.text.trim();
       final content = _contentCtrl.text.trim();
-      final targetClass = _targetClass == 'Todas as turmas' ? null : _targetClass;
+
+      // Validate required fields are not empty
+      if (title.isEmpty) {
+        _showError('O título não pode estar vazio');
+        return;
+      }
+      if (content.isEmpty) {
+        _showError('O conteúdo não pode estar vazio');
+        return;
+      }
+
+      final targetClass = _targetClass == 'Todas as turmas' || _targetClass == null 
+          ? null 
+          : _targetClass;
 
       final req = SendMessageRequest(
         title: title,
@@ -277,6 +349,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         isDraft: false,
         scheduledAt: null,
       );
+      
       debugPrint('sendNow payload: ${req.toJson()}');
 
       // Confirm final send
@@ -302,12 +375,21 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       if (confirm != true) return;
 
       // Save (create/update) first to get an ID, then call send endpoint
-      Message saved;
+      Message? saved;
       final editingMessage = _editingMessage;
-      if (editingMessage != null) {
-        saved = await _api.updateMessage(editingMessage.id, req);
-      } else {
-        saved = await _api.createMessage(req);
+      
+      try {
+        if (editingMessage != null) {
+          saved = await _api.updateMessage(editingMessage.id, req);
+        } else {
+          saved = await _api.createMessage(req);
+        }
+      } catch (e) {
+        throw 'Erro ao salvar mensagem: $e';
+      }
+
+      if (saved.id.isEmpty) {
+        throw 'Erro ao obter ID da mensagem salva';
       }
 
       await _api.sendDraft(saved.id);
@@ -335,14 +417,27 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       if (!_validateStep1() || !_validateSchedule()) return;
 
       final selectedType = _selectedType;
-      if (selectedType == null) {
+      if (selectedType == null || selectedType.isEmpty) {
         _showError('Selecione o tipo de envio');
         return;
       }
 
       final title = _titleCtrl.text.trim();
       final content = _contentCtrl.text.trim();
-      final targetClass = _targetClass == 'Todas as turmas' ? null : _targetClass;
+
+      // Validate required fields are not empty
+      if (title.isEmpty) {
+        _showError('O título não pode estar vazio');
+        return;
+      }
+      if (content.isEmpty) {
+        _showError('O conteúdo não pode estar vazio');
+        return;
+      }
+
+      final targetClass = _targetClass == 'Todas as turmas' || _targetClass == null 
+          ? null 
+          : _targetClass;
       final scheduledAt = _scheduledTime;
 
       final req = SendMessageRequest(
@@ -564,18 +659,30 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
               border: Border.all(color: Theme.of(context).dividerColor),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: DropdownButton<String>(
-              value: _targetClass,
-              isExpanded: true,
-              dropdownColor: Theme.of(context).cardColor,
-              underline: const SizedBox(),
-              hint: const Text('Todas as turmas'),
-              icon: const Icon(Icons.keyboard_arrow_down),
-              items: _classes
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: (v) => setState(() => _targetClass = v),
-            ),
+            child: _loadingClasses
+                ? const Padding(
+                    padding: EdgeInsets.all(12.0),
+                    child: SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentBlue),
+                      ),
+                    ),
+                  )
+                : DropdownButton<String>(
+                    value: _targetClass,
+                    isExpanded: true,
+                    dropdownColor: Theme.of(context).cardColor,
+                    underline: const SizedBox(),
+                    hint: const Text('Todas as turmas'),
+                    icon: const Icon(Icons.keyboard_arrow_down),
+                    items: _classes
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                        .toList(),
+                    onChanged: (v) => setState(() => _targetClass = v),
+                  ),
           ),
           const SizedBox(height: 18),
 

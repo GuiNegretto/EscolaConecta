@@ -29,14 +29,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   String _selectedFilter = 'Todas';
   late TabController _tabController;
 
-  final _statusFilters = [
-    'Todas',
-    'Rascunhos',
-    'Agendadas',
-    'Pendentes',
-    'Enviadas',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -66,9 +58,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final msgs = await _api.getAdminMessages();
+      // Carregar mensagens enviadas e rascunhos em paralelo
+      final results = await Future.wait([
+        _api.getAdminMessages(isDraft: false),
+        _api.getAdminMessages(isDraft: true),
+      ]);
+      
       setState(() {
-        _allMessages = msgs;
+        _allMessages = [...results[0], ...results[1]];
         _loading = false;
       });
     } catch (e) {

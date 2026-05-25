@@ -2,16 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'services/auth_provider.dart';
 import 'services/link_provider.dart';
+import 'services/notification_service.dart';
 import 'utils/app_theme.dart';
 import 'screens/auth/role_selection_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/parent/parent_messages_screen.dart';
 import 'services/theme_provider.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Notification Service after Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+ await NotificationService.instance.initialize();
+  
   await initializeDateFormatting('pt_BR');
 
   // Lock to portrait

@@ -10,6 +10,9 @@ class ApiRoutes {
   static const String adminGuardians = '/admin/guardians';
   static String adminGuardian(String id) => '$adminGuardians/$id';
 
+  static const String adminLinks = '/admin/student-parent-links';
+  static String adminLink(String studentId, String parentId) => '$adminLinks/$studentId/$parentId';
+
   static const String guardianMessages = '/guardian/messages';
   static String guardianMessage(String id) => '$guardianMessages/$id';
   static const String guardianProfile = '/guardian/profile';

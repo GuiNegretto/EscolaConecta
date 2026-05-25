@@ -90,19 +90,14 @@ class _LinkStudentModalState extends State<LinkStudentModal> {
     });
 
     try {
-      final success = await context.read<LinkProvider>().linkStudentParent(
+      await _api.linkStudentParent(
         widget.studentLink.student.id,
         _selectedParent!.id,
       );
 
-      if (success && mounted) {
+      if (mounted) {
         widget.onSuccess?.call();
         Navigator.of(context).pop();
-      } else if (mounted) {
-        setState(() {
-          _error =
-              context.read<LinkProvider>().error ?? 'Erro ao vincular responsável';
-        });
       }
     } catch (e) {
       if (mounted) {

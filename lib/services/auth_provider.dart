@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../screens/auth/role_selection_screen.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
@@ -52,6 +53,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Call notification service to remove token from server BEFORE clearing local token
+    try {
+      await NotificationService.instance.onUserLoggedOut();
+    } catch (e) {
+      debugPrint('Error notifying server on logout: $e');
+    }
+    
+    // Clear local authentication token
     await _api.logout();
     _user = null;
     _status = AuthStatus.unauthenticated;

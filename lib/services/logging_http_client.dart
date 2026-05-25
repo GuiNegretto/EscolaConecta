@@ -114,16 +114,7 @@ class LoggingHttpClient extends http.BaseClient {
 
   String _extractRequestBody(http.BaseRequest request) {
     if (request is http.MultipartRequest) {
-    // Se for Multipart, o corpo NÃO É JSON.
-    return '--- MULTIPART DATA ---\nFields: ${request.fields}\nFiles: ${request.files.map((f) => f.filename).toList()}';
-  }
-  
-    if (request is http.Request) {
-      if (request.body.isEmpty) return '';
-      return _sanitizeBody(request.body);
-    }
-
-    if (request is http.MultipartRequest) {
+      // Multipart: não é JSON, mostra campos e arquivos
       final parts = <String>[];
       if (request.fields.isNotEmpty) {
         parts.add('Fields: ${jsonEncode(_sanitizeBodyMap(request.fields))}');
@@ -131,7 +122,12 @@ class LoggingHttpClient extends http.BaseClient {
       if (request.files.isNotEmpty) {
         parts.add('Files: ${request.files.map((file) => file.filename).toList()}');
       }
-      return parts.join(' | ');
+      return parts.isNotEmpty ? parts.join(' | ') : '--- MULTIPART DATA ---';
+    }
+
+    if (request is http.Request) {
+      if (request.body.isEmpty) return '';
+      return _sanitizeBody(request.body);
     }
 
     return '';

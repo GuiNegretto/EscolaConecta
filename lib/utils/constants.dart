@@ -14,6 +14,7 @@ class AppConstants {
   static const String adminMessagesEndpoint = ApiRoutes.adminMessages;
   static const String adminStudentsEndpoint = ApiRoutes.adminStudents;
   static const String adminGuardiansEndpoint = ApiRoutes.adminGuardians;
+  static const String adminLinksEndpoint = ApiRoutes.adminLinks;
 
   static const String guardianMessagesEndpoint = ApiRoutes.guardianMessages;
   static const String guardianProfileEndpoint = ApiRoutes.guardianProfile;
@@ -27,4 +28,5 @@ class AppConstants {
   static const String sendMessageEndpoint = adminMessagesEndpoint;
   static const String studentsEndpoint = adminStudentsEndpoint;
   static const String parentsEndpoint = adminGuardiansEndpoint;
+  static const String linksEndpoint = adminLinksEndpoint;
 }

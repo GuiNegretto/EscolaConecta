@@ -221,10 +221,11 @@ class ApiService {
     return list.map((e) => Message.fromJson(e)).toList();
   }
 
-  Future<List<Message>> getAdminMessages({String? type, String? className}) async {
+  Future<List<Message>> getAdminMessages({String? type, String? className, bool? isDraft}) async {
     final queryParameters = <String, String>{};
     if (type != null && type.isNotEmpty) queryParameters['type'] = type;
     if (className != null && className.isNotEmpty) queryParameters['class'] = className;
+    if (isDraft != null) queryParameters['is_draft'] = isDraft ? '1' : '0';
 
     final path = queryParameters.isNotEmpty
         ? '${AppConstants.adminMessagesEndpoint}?${Uri(queryParameters: queryParameters).query}'
@@ -280,54 +281,100 @@ class ApiService {
 
   Future<Message> createMessage(SendMessageRequest req, {List<String>? filePaths}) async {
     await _ensureTokenLoaded();
-    // If there are files, use multipart; otherwise send JSON
-    //if (filePaths != null && filePaths.isNotEmpty) {
-      final uri = Uri.parse('${AppConstants.baseUrl}${AppConstants.adminMessagesEndpoint}');
-      final reqMultipart = http.MultipartRequest('POST', uri)
-        ..headers.addAll(_authHeaders)
-        ..headers.remove('Content-Type'); // Remova SEMPRE o Content-Type
+    final uri = Uri.parse('${AppConstants.baseUrl}${AppConstants.adminMessagesEndpoint}');
+    final reqMultipart = http.MultipartRequest('POST', uri)
+      ..headers.addAll(_authHeaders)
+      ..headers.remove('Content-Type'); // Remova SEMPRE o Content-Type
 
-        reqMultipart.fields['title'] = req.title;
-        reqMultipart.fields['body'] = req.content ?? '';
-        reqMultipart.fields['type'] = req.type;
-        reqMultipart.fields['is_draft'] = req.isDraft ? '1' : '0';
+    // Add required fields
+    reqMultipart.fields['title'] = req.title;
+    reqMultipart.fields['body'] = req.content;
+    reqMultipart.fields['type'] = req.type;
+    reqMultipart.fields['is_draft'] = req.isDraft ? '1' : '0';
 
-      if (filePaths != null && filePaths.isNotEmpty) {
+    // Handle targetClass: split "3º Ano - A" into grade and class
+    if (req.targetClass != null && req.targetClass!.isNotEmpty) {
+      final parts = req.targetClass!.split(' - ');
+      if (parts.length == 2) {
+        reqMultipart.fields['grade'] = parts[0];
+        reqMultipart.fields['class'] = parts[1];
+      } else {
+        // Fallback: treat entire string as class
+        reqMultipart.fields['class'] = req.targetClass!;
+      }
+    }
+
+    // Handle targetParentId for individual messages
+    if (req.targetParentId != null && req.targetParentId!.isNotEmpty) {
+      reqMultipart.fields['guardian_ids[]'] = req.targetParentId!;
+    }
+
+    // Add scheduled_at if present
+    if (req.scheduledAt != null) {
+      reqMultipart.fields['scheduled_at'] = req.scheduledAt!.toUtc().toIso8601String();
+    }
+
+    // Add files if provided
+    if (filePaths != null && filePaths.isNotEmpty) {
       for (final path in filePaths) {
         reqMultipart.files.add(await http.MultipartFile.fromPath('files[]', path));
       }
-      }
+    }
 
-      final streamed = await _client.send(reqMultipart);
-      final res = await http.Response.fromStream(streamed);
-      final data = await _handleResponse(res);
-      return Message.fromJson(data as Map<String, dynamic>);
-    //}
-
-    //final data = await _post(AppConstants.adminMessagesEndpoint, req.toJson());
-    //return Message.fromJson(data as Map<String, dynamic>);
+    final streamed = await _client.send(reqMultipart);
+    final res = await http.Response.fromStream(streamed);
+    final data = await _handleResponse(res);
+    return Message.fromJson(data as Map<String, dynamic>);
   }
 
   Future<Message> updateMessage(String id, SendMessageRequest req, {List<String>? filePaths}) async {
     await _ensureTokenLoaded();
     final path = '${AppConstants.adminMessagesEndpoint}/$id';
-    if (filePaths != null && filePaths.isNotEmpty) {
-      final uri = Uri.parse('${AppConstants.baseUrl}$path');
-      final reqMultipart = http.MultipartRequest('PUT', uri)
-        ..headers.addAll(_authHeaders)
-        ..fields.addAll(req.toJson().map((k, v) => MapEntry(k, v is List ? jsonEncode(v) : v.toString())));
+    
+    // Always use multipart for consistency with createMessage
+    final uri = Uri.parse('${AppConstants.baseUrl}$path');
+    final reqMultipart = http.MultipartRequest('PUT', uri)
+      ..headers.addAll(_authHeaders)
+      ..headers.remove('Content-Type');
 
+    // Add required fields
+    reqMultipart.fields['title'] = req.title;
+    reqMultipart.fields['body'] = req.content;
+    reqMultipart.fields['type'] = req.type;
+    reqMultipart.fields['is_draft'] = req.isDraft ? '1' : '0';
+
+    // Handle targetClass: split "3º Ano - A" into grade and class
+    if (req.targetClass != null && req.targetClass!.isNotEmpty) {
+      final parts = req.targetClass!.split(' - ');
+      if (parts.length == 2) {
+        reqMultipart.fields['grade'] = parts[0];
+        reqMultipart.fields['class'] = parts[1];
+      } else {
+        // Fallback: treat entire string as class
+        reqMultipart.fields['class'] = req.targetClass!;
+      }
+    }
+
+    // Handle targetParentId for individual messages
+    if (req.targetParentId != null && req.targetParentId!.isNotEmpty) {
+      reqMultipart.fields['guardian_ids[]'] = req.targetParentId!;
+    }
+
+    // Add scheduled_at if present
+    if (req.scheduledAt != null) {
+      reqMultipart.fields['scheduled_at'] = req.scheduledAt!.toUtc().toIso8601String();
+    }
+
+    // Add files if provided
+    if (filePaths != null && filePaths.isNotEmpty) {
       for (final path in filePaths) {
         reqMultipart.files.add(await http.MultipartFile.fromPath('files[]', path));
       }
-
-      final streamed = await _client.send(reqMultipart);
-      final res = await http.Response.fromStream(streamed);
-      final data = await _handleResponse(res);
-      return Message.fromJson(data as Map<String, dynamic>);
     }
 
-    final data = await _put(path, req.toJson());
+    final streamed = await _client.send(reqMultipart);
+    final res = await http.Response.fromStream(streamed);
+    final data = await _handleResponse(res);
     return Message.fromJson(data as Map<String, dynamic>);
   }
 
@@ -433,40 +480,12 @@ class ApiService {
   }
 
   Future<void> linkStudentParent(String studentId, String parentId) async {
-    // Buscar o responsável atual
-    final parent = await _get('${AppConstants.parentsEndpoint}/$parentId');
-    final parentObj = Parent.fromJson(parent);
-
-    // Adicionar o studentId se não estiver presente
-    if (!parentObj.studentIds.contains(studentId)) {
-      final updatedStudentIds = [...parentObj.studentIds.map((id) => int.parse(id)), (int.parse(studentId))];
-
-      // Atualizar o responsável com o novo vínculo
-      await updateParent(parentId, {
-        'name': parentObj.name,
-        'phone': parentObj.phone,
-        'phone_secondary': parentObj.phoneSecondary,
-        'email_secondary': parentObj.emailSecondary,
-        'student_ids': updatedStudentIds,
-      });
-    }
+    await _post('${AppConstants.parentsEndpoint}/$parentId/links', {
+      'student_id': int.parse(studentId),
+    });
   }
 
   Future<void> unlinkStudentParent(String studentId, String parentId) async {
-    // Buscar o responsável atual
-    final parent = await _get('${AppConstants.parentsEndpoint}/$parentId');
-    final parentObj = Parent.fromJson(parent);
-
-    // Remover o studentId se estiver presente
-    final updatedStudentIds = parentObj.studentIds.where((id) => id != studentId).toList();
-
-    // Atualizar o responsável removendo o vínculo
-    await updateParent(parentId, {
-      'name': parentObj.name,
-      'phone': parentObj.phone,
-      'phone_secondary': parentObj.phoneSecondary,
-      'email_secondary': parentObj.emailSecondary,
-      'student_ids': updatedStudentIds,
-    });
+    await _delete('${AppConstants.parentsEndpoint}/$parentId/links/$studentId');
   }
 }

@@ -88,11 +88,25 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
           ));
         }
       } else {
-        // Criar novo pai (esperado que seja criado via API de estudante)
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Guardiões são criados quando um estudante os adiciona.'),
-          backgroundColor: AppTheme.warning,
-        ));
+        // Criar novo guardião via API
+        final newParent = Parent(
+          id: '', // será preenchido pela API na resposta
+          name: _nameCtrl.text,
+          email: _emailCtrl.text,
+          cpf: _cpfCtrl.text.isNotEmpty ? _cpfCtrl.text : null,
+          phone: _phoneCtrl.text,
+          phoneSecondary: null,
+          emailSecondary: null,
+          studentIds: const [],
+        );
+        final created = await _api.createParent(newParent);
+        _parents.add(created);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Guardião criado com sucesso!'),
+            backgroundColor: AppTheme.success,
+          ));
+        }
       }
 
       setState(() {});
@@ -265,7 +279,7 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
                   child: EmptyState(
                     icon: Icons.people_outline,
                     title: 'Nenhum guardião',
-                    subtitle: 'Guardiões aparecem quando estudantes os adicionam',
+                    subtitle: 'Nenhum guardião cadastrado ainda.',
                   ),
                 )
               : RefreshIndicator(
