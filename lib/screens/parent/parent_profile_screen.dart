@@ -4,6 +4,7 @@ import '../../services/auth_provider.dart';
 import '../../services/theme_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/app_loading_error_widgets.dart';
 
 class ParentProfileScreen extends StatefulWidget {
   const ParentProfileScreen({super.key});
@@ -51,10 +52,16 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
     if (!mounted) return;
     setState(() => _saving = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(ok ? 'Dados atualizados!' : auth.error ?? 'Erro ao salvar'),
-      backgroundColor: ok ? AppTheme.success : AppTheme.danger,
-    ));
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dados atualizados!')),
+      );
+    } else {
+      AppErrorDialog.show(
+        context,
+        message: auth.error ?? 'Erro ao salvar',
+      );
+    }
   }
 
   @override
@@ -77,7 +84,7 @@ class _ParentProfileScreenState extends State<ParentProfileScreen> {
           ),
         ],
       ),
-      body: LoadingOverlay(
+      body: AppLoadingOverlay(
         isLoading: _saving,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),

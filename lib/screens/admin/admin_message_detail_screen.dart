@@ -4,6 +4,7 @@ import '../../models/models.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/admin_dashboard_widgets.dart';
+import '../../widgets/app_loading_error_widgets.dart';
 
 class AdminMessageDetailScreen extends StatefulWidget {
   final String messageId;
@@ -176,7 +177,7 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
           backgroundColor: AppTheme.primaryBlue,
         ),
         body: const Center(
-          child: CircularProgressIndicator(color: AppTheme.accentBlue),
+          child: AppLoadingIndicator(size: 48, color: AppTheme.accentBlue),
         ),
       );
     }

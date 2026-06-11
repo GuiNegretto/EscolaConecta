@@ -3,6 +3,7 @@ import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/link_provider.dart';
 import 'package:provider/provider.dart';
+import 'app_loading_error_widgets.dart';
 
 class LinkStudentModal extends StatefulWidget {
   final StudentParentLink studentLink;
@@ -234,7 +235,7 @@ class _LinkStudentModalState extends State<LinkStudentModal> {
 
   Widget _buildContent(ScrollController? scrollController) {
     if (_isLoadingParents) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppLoadingIndicator(size: 48));
     }
 
     if (_error != null && _allParents.isEmpty) {
@@ -386,11 +387,7 @@ class _LinkStudentModalState extends State<LinkStudentModal> {
                             ? _linkParent
                             : null,
                     child: _isLinking
-                        ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                        ? const AppLoadingButtonIndicator()
                         : const Text('Vincular'),
                   ),
                 ),

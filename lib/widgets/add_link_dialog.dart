@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/link_provider.dart';
+import 'app_loading_error_widgets.dart';
 
 class AddLinkDialog extends StatefulWidget {
   const AddLinkDialog({super.key});
@@ -68,11 +69,9 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
         ),
       );
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.read<LinkProvider>().error ?? 'Erro ao criar vínculo'),
-          backgroundColor: Colors.red,
-        ),
+      AppErrorDialog.show(
+        context,
+        message: context.read<LinkProvider>().error ?? 'Erro ao criar vínculo',
       );
     }
   }
@@ -101,7 +100,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
+                    child: AppLoadingIndicator(size: 40),
                   ),
                 )
               else if (_error != null)

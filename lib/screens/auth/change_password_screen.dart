@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../services/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/app_loading_error_widgets.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -54,8 +55,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error ?? 'Erro ao alterar senha.')),
+      AppErrorDialog.show(
+        context,
+        message: auth.error ?? 'Erro ao alterar senha.',
       );
     }
   }
@@ -133,11 +135,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               ElevatedButton(
                 onPressed: _loading ? null : _submit,
                 child: _loading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const AppLoadingButtonIndicator()
                     : const Text('Atualizar senha'),
               ),
             ],

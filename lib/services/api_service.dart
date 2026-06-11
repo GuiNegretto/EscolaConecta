@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../services/logging_http_client.dart';
 import '../utils/constants.dart';
+import '../utils/api_routes.dart';
 import '../services/auth_provider.dart';
 
 class ApiException implements Exception {
@@ -60,6 +62,7 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('user_data');
+    await prefs.remove('remember_me');
   }
 
   Map<String, String> get _headers => {
@@ -172,7 +175,9 @@ class ApiService {
       await prefs.setString('user_data', jsonEncode(data));
       await prefs.setBool('remember_me', true);
     } else {
-      await prefs.setBool('remember_me', false);
+      // Clear stored session data when remember is unchecked
+      await prefs.remove('user_data');
+      await prefs.remove('remember_me');
     }
     return user;
   }
@@ -487,5 +492,136 @@ class ApiService {
 
   Future<void> unlinkStudentParent(String studentId, String parentId) async {
     await _delete('${AppConstants.parentsEndpoint}/$parentId/links/$studentId');
+  }
+
+  // ── CSV Import ────────────────────────────────────────────────────────────
+
+  /// Upload CSV file for bulk import of students and guardians
+  ///
+  /// Expected endpoint: POST /admin/import/students
+  /// Returns ImportResult with statistics and errors
+  Future<ImportResult> importStudentsFromCsv(String filePath) async {
+    await _ensureTokenLoaded();
+    final uri = Uri.parse('${AppConstants.baseUrl}${ApiRoutes.adminImportStudents}');
+
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll(_authHeaders)
+      ..headers.remove('Content-Type'); // Let http.MultipartRequest set it
+
+    // Add CSV file
+    request.files.add(await http.MultipartFile.fromPath('file', filePath));
+
+    try {
+      debugPrint('[API] Upload CSV via path');
+      debugPrint('[API] Endpoint: POST ${AppConstants.baseUrl}/admin/import/students');
+      debugPrint('[API] Headers: $_authHeaders');
+      
+      final streamed = await _client.send(request).timeout(const Duration(minutes: 5));
+      final response = await http.Response.fromStream(streamed);
+      
+      debugPrint('[API] Response status: ${response.statusCode}');
+      debugPrint('[API] Response body: ${response.body}');
+      
+      final data = await _handleResponse(response);
+
+      if (data is Map<String, dynamic>) {
+        return ImportResult.fromJson(data);
+      }
+
+      // Fallback if response structure is different
+      return ImportResult(
+        totalProcessed: data is Map ? data['total'] ?? 0 : 0,
+        totalImported: data is Map ? data['imported'] ?? 0 : 0,
+        totalIgnored: data is Map ? data['ignored'] ?? 0 : 0,
+        totalErrors: data is Map ? data['errors'] ?? 0 : 0,
+        errors: [],
+        importedAt: DateTime.now(),
+      );
+    } catch (e) {
+      debugPrint('[API] Erro ao fazer upload do CSV: $e');
+      throw ApiException('Erro ao fazer upload do CSV: ${e.toString()}');
+    }
+  }
+
+  /// Upload CSV file from bytes (for Flutter Web compatibility)
+  ///
+  /// Expected endpoint: POST /admin/import/students
+  /// Returns ImportResult with statistics and errors
+  Future<ImportResult> importStudentsFromCsvBytes(Uint8List fileBytes) async {
+    await _ensureTokenLoaded();
+    final uri = Uri.parse('${AppConstants.baseUrl}${ApiRoutes.adminImportStudents}');
+
+    debugPrint('════════════════════════════════════════════════════════════════════════');
+    debugPrint('[API-CSV] =============================================================');
+    debugPrint('[API-CSV] INICIANDO UPLOAD DE CSV VIA BYTES');
+    debugPrint('[API-CSV] =============================================================');
+    debugPrint('[API-CSV] Endpoint: POST ${AppConstants.baseUrl}/admin/import/students');
+    debugPrint('[API-CSV] Token loaded: ${_token != null ? "✓ (${_token!.substring(0, 8)}...)" : "✗"}');
+    debugPrint('[API-CSV] Auth Headers: $_authHeaders');
+    debugPrint('[API-CSV] File size: ${fileBytes.length} bytes');
+
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll(_authHeaders);
+
+    // CRITICAL: Remove Content-Type to let multipart set it automatically
+    request.headers.remove('Content-Type');
+    request.headers.remove('content-type');
+
+    debugPrint('[API-CSV] Request headers after cleanup: ${request.headers}');
+
+    // Add CSV file from bytes
+    final multipartFile = http.MultipartFile.fromBytes(
+      'file',  // This MUST match the backend field name
+      fileBytes,
+      filename: 'import.csv',
+    );
+
+    request.files.add(multipartFile);
+
+    debugPrint('[API-CSV] Multipart file added');
+    debugPrint('[API-CSV]   Field name: file');
+    debugPrint('[API-CSV]   Filename: import.csv');
+    debugPrint('[API-CSV]   Size: ${fileBytes.length} bytes');
+    debugPrint('[API-CSV]   Content-Type will be: ${multipartFile.contentType}');
+
+    try {
+      debugPrint('[API-CSV] Enviando requisição...');
+
+      final streamed = await _client.send(request).timeout(const Duration(minutes: 5));
+      final response = await http.Response.fromStream(streamed);
+
+      debugPrint('[API-CSV] =============================================================');
+      debugPrint('[API-CSV] RESPOSTA RECEBIDA');
+      debugPrint('[API-CSV] =============================================================');
+      debugPrint('[API-CSV] Status Code: ${response.statusCode}');
+      debugPrint('[API-CSV] Status Text: ${response.reasonPhrase}');
+      debugPrint('[API-CSV] Response Headers: ${response.headers}');
+      debugPrint('[API-CSV] Response Body: ${response.body}');
+
+      final data = await _handleResponse(response);
+
+      if (data is Map<String, dynamic>) {
+        debugPrint('[API-CSV] ✓ Parse JSON bem-sucedido');
+        return ImportResult.fromJson(data);
+      }
+
+      // Fallback if response structure is different
+      debugPrint('[API-CSV] ⚠ Resposta com formato diferente, usando fallback');
+      return ImportResult(
+        totalProcessed: data is Map ? data['total'] ?? 0 : 0,
+        totalImported: data is Map ? data['imported'] ?? 0 : 0,
+        totalIgnored: data is Map ? data['ignored'] ?? 0 : 0,
+        totalErrors: data is Map ? data['errors'] ?? 0 : 0,
+        errors: [],
+        importedAt: DateTime.now(),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[API-CSV] =============================================================');
+      debugPrint('[API-CSV] ✗ ERRO DURANTE UPLOAD');
+      debugPrint('[API-CSV] =============================================================');
+      debugPrint('[API-CSV] Error: $e');
+      debugPrint('[API-CSV] StackTrace: $stackTrace');
+      throw ApiException('Erro ao fazer upload do CSV: ${e.toString()}');
+    }
   }
 }

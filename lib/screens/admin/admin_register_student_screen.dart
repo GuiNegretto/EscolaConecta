@@ -3,6 +3,7 @@ import '../../models/models.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/app_loading_error_widgets.dart';
 
 class AdminRegisterStudentScreen extends StatefulWidget {
   const AdminRegisterStudentScreen({super.key});
@@ -106,7 +107,7 @@ class _AdminRegisterStudentScreenState
         title: const Text('Cadastrar Aluno'),
         leading: const BackButton(color: Colors.white),
       ),
-      body: LoadingOverlay(
+      body: AppLoadingOverlay(
         isLoading: _saving,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -225,8 +226,8 @@ class _AdminRegisterStudentScreenState
               const SizedBox(height: 10),
               _loadingList
                   ? const Center(
-                      child: CircularProgressIndicator(
-                          color: AppTheme.accentBlue))
+                      child: AppLoadingIndicator(
+                          size: 48, color: AppTheme.accentBlue))
                   : _students.isEmpty
                       ? const EmptyState(
                           icon: Icons.school_outlined,

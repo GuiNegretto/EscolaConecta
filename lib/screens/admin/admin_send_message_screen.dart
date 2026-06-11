@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../models/models.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
+import '../../widgets/app_loading_error_widgets.dart';
 
 class AdminSendMessageScreen extends StatefulWidget {
   final String? messageId;
@@ -173,6 +174,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         return;
       }
 
+
       final req = SendMessageRequest(
         title: title,
         content: content,
@@ -183,7 +185,6 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         isDraft: true,
         scheduledAt: _isScheduled ? _scheduledTime : null,
       );
-      debugPrint('saveDraft payload: ${req.toJson()}');
 
       final editingMessage = _editingMessage;
       if (editingMessage != null) {
@@ -279,6 +280,8 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           : _targetClass;
       final scheduledAt = _isScheduled ? _scheduledTime : null;
 
+
+
       final req = SendMessageRequest(
         title: title,
         content: content,
@@ -287,7 +290,6 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         isDraft: true,
         scheduledAt: scheduledAt,
       );
-      debugPrint('saveDraftOnly payload: ${req.toJson()}');
 
       final editingMessage = _editingMessage;
       if (editingMessage != null) {
@@ -341,6 +343,8 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           ? null 
           : _targetClass;
 
+
+
       final req = SendMessageRequest(
         title: title,
         content: content,
@@ -349,8 +353,6 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         isDraft: false,
         scheduledAt: null,
       );
-      
-      debugPrint('sendNow payload: ${req.toJson()}');
 
       // Confirm final send
       if (!mounted) return;
@@ -440,6 +442,8 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           : _targetClass;
       final scheduledAt = _scheduledTime;
 
+
+
       final req = SendMessageRequest(
         title: title,
         content: content,
@@ -448,7 +452,6 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         isDraft: false,
         scheduledAt: scheduledAt,
       );
-      debugPrint('scheduleMessage payload: ${req.toJson()}');
 
       // Create or update with schedule (server will handle scheduling)
       final editingMessage = _editingMessage;
@@ -483,7 +486,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           backgroundColor: AppTheme.primaryBlue,
         ),
         body: const Center(
-          child: CircularProgressIndicator(color: AppTheme.accentBlue),
+          child: AppLoadingIndicator(size: 48, color: AppTheme.accentBlue),
         ),
       );
     }
@@ -665,9 +668,8 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
                     child: SizedBox(
                       height: 24,
                       width: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentBlue),
+                      child: AppThreeDotLoader(
+                        color: AppTheme.accentBlue,
                       ),
                     ),
                   )

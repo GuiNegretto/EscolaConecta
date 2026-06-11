@@ -3,6 +3,7 @@ import '../../models/models.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/app_loading_error_widgets.dart';
 
 class AdminRegisterParentScreen extends StatefulWidget {
   const AdminRegisterParentScreen({super.key});
@@ -238,11 +239,7 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
         ElevatedButton(
           onPressed: _loading ? null : _saveParent,
           child: _loading
-              ? const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+              ? const AppLoadingButtonIndicator()
               : const Text('Salvar'),
         ),
       ],
@@ -272,7 +269,7 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
       ),
       body: _loading && _parents.isEmpty
           ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.accentBlue),
+              child: AppLoadingIndicator(size: 48, color: AppTheme.accentBlue),
             )
           : _parents.isEmpty
               ? Center(

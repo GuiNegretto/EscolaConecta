@@ -13,6 +13,9 @@ class ApiRoutes {
   static const String adminLinks = '/admin/student-parent-links';
   static String adminLink(String studentId, String parentId) => '$adminLinks/$studentId/$parentId';
 
+  // CSV Import endpoint
+  static const String adminImportStudents = '/admin/import/students';
+
   static const String guardianMessages = '/guardian/messages';
   static String guardianMessage(String id) => '$guardianMessages/$id';
   static const String guardianProfile = '/guardian/profile';

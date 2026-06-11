@@ -4,6 +4,7 @@ import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/admin_dashboard_widgets.dart';
 import '../../widgets/link_student_modal.dart';
+import '../../widgets/app_loading_error_widgets.dart';
 import 'package:intl/intl.dart';
 
 class AdminStudentParentLinksScreen extends StatefulWidget {
@@ -89,8 +90,9 @@ class _AdminStudentParentLinksScreenState extends State<AdminStudentParentLinksS
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar detalhes: $e'), backgroundColor: AppTheme.danger),
+        AppErrorDialog.show(
+          context,
+          message: 'Erro ao carregar detalhes: $e',
         );
       }
     } finally {
@@ -130,8 +132,9 @@ class _AdminStudentParentLinksScreenState extends State<AdminStudentParentLinksS
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao desvincular: $e'), backgroundColor: AppTheme.danger),
+          AppErrorDialog.show(
+            context,
+            message: 'Erro ao desvincular: $e',
           );
         }
       }
@@ -184,7 +187,7 @@ class _AdminStudentParentLinksScreenState extends State<AdminStudentParentLinksS
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: AppLoadingIndicator(size: 48))
           : _error != null
               ? CommunicationEmptyState(
                   title: 'Ops!',
@@ -256,7 +259,7 @@ class _AdminStudentParentLinksScreenState extends State<AdminStudentParentLinksS
                           Expanded(
                             flex: 3,
                             child: _loadingDetails
-                                ? const Center(child: CircularProgressIndicator())
+                                ? const Center(child: AppLoadingIndicator(size: 48))
                                 : _selectedStudent == null
                                     ? const CommunicationEmptyState(
                                         title: 'Nenhum aluno selecionado',
@@ -500,7 +503,7 @@ class _EditGuardianDialogState extends State<_EditGuardianDialog> {
         ElevatedButton(
           onPressed: _loading ? null : _save,
           child: _loading 
-            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+            ? const AppLoadingButtonIndicator(color: Colors.white)
             : const Text('Salvar Alterações'),
         ),
       ],

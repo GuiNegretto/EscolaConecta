@@ -6,6 +6,7 @@ import '../../services/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/admin_dashboard_widgets.dart';
 import '../../services/theme_provider.dart';
+import '../../widgets/app_loading_error_widgets.dart';
 import 'admin_send_message_screen.dart';
 import 'admin_register_parent_screen.dart';
 import 'admin_register_student_screen.dart';
@@ -71,8 +72,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar: $e')),
+        AppErrorDialog.show(
+          context,
+          message: 'Erro ao carregar: $e',
         );
       }
     }
@@ -173,7 +175,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         color: AppTheme.accentBlue,
         child: _loading
             ? const Center(
-                child: CircularProgressIndicator(color: AppTheme.accentBlue),
+                child: AppLoadingIndicator(size: 48, color: AppTheme.accentBlue),
               )
             : SingleChildScrollView(
               key: const PageStorageKey('admin_dashboard_scroll'),
@@ -337,17 +339,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 context,
                 MaterialPageRoute(builder: (_) => const AdminImportScreen()),
               ).then((_) => _load()),
-            ),
-            QuickAccessButton(
-              icon: Icons.history,
-              label: 'Histórico',
-              color: Colors.indigo,
-              onTap: () {
-                // TODO: Implementar histórico completo
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Histórico em desenvolvimento')),
-                );
-              },
             ),
           ],
         ),

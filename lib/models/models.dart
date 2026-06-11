@@ -332,6 +332,166 @@ class SendMessageRequest {
       };
 }
 
+// ─── CSV Import Models ──────────────────────────────────────────────────────
+
+class ImportError {
+  final int row;
+  final String field;
+  final String message;
+
+  const ImportError({
+    required this.row,
+    required this.field,
+    required this.message,
+  });
+
+  factory ImportError.fromJson(Map<String, dynamic> json) {
+    return ImportError(
+      row: json['row'] ?? 0,
+      field: json['field'] ?? json['column'] ?? '',
+      message: json['message'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'row': row,
+        'field': field,
+        'message': message,
+      };
+}
+
+class ImportResult {
+  final int totalProcessed;
+  final int totalImported;
+  final int totalIgnored;
+  final int totalErrors;
+  final List<ImportError> errors;
+  final DateTime? importedAt;
+
+  const ImportResult({
+    required this.totalProcessed,
+    required this.totalImported,
+    required this.totalIgnored,
+    required this.totalErrors,
+    required this.errors,
+    this.importedAt,
+  });
+
+  factory ImportResult.fromJson(Map<String, dynamic> json) {
+    final errorsList = (json['errors'] as List<dynamic>?)
+            ?.map((e) => ImportError.fromJson(e is Map<String, dynamic> ? e : {}))
+            .toList() ??
+        [];
+
+    return ImportResult(
+      totalProcessed: json['total_processed'] ?? json['total'] ?? 0,
+      totalImported: json['total_imported'] ?? json['imported'] ?? 0,
+      totalIgnored: json['total_ignored'] ?? json['ignored'] ?? 0,
+      totalErrors: json['total_errors'] ?? json['failed'] ?? errorsList.length,
+      errors: errorsList,
+      importedAt: json['imported_at'] != null ? DateTime.tryParse(json['imported_at']) : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'total_processed': totalProcessed,
+        'total_imported': totalImported,
+        'total_ignored': totalIgnored,
+        'total_errors': totalErrors,
+        'errors': errors.map((e) => e.toJson()).toList(),
+        'imported_at': importedAt?.toIso8601String(),
+      };
+
+  int get successRate => totalProcessed > 0 ? ((totalImported * 100) ~/ totalProcessed) : 0;
+  bool get hasErrors => errors.isNotEmpty && totalErrors > 0;
+}
+
+class CsvRow {
+  final int lineNumber;
+  final String studentName;
+  final String grade;
+  final String className;
+  final String guardianName;
+  final String guardianEmail;
+  final String guardianPhone;
+  final String? guardianPhoneSecondary;
+  final String? guardianEmailSecondary;
+  String? validationError;
+
+  CsvRow({
+    required this.lineNumber,
+    required this.studentName,
+    required this.grade,
+    required this.className,
+    required this.guardianName,
+    required this.guardianEmail,
+    required this.guardianPhone,
+    this.guardianPhoneSecondary,
+    this.guardianEmailSecondary,
+    this.validationError,
+  });
+
+  bool get isValid => validationError == null;
+
+  factory CsvRow.fromCsvLine(List<dynamic> line, int lineNumber) {
+    final row = CsvRow(
+      lineNumber: lineNumber,
+      studentName: _parseField(line, 0),
+      grade: _parseField(line, 1),
+      className: _parseField(line, 2),
+      guardianName: _parseField(line, 3),
+      guardianEmail: _parseField(line, 4),
+      guardianPhone: _parseField(line, 5),
+      guardianPhoneSecondary: _parseFieldOptional(line, 6),
+      guardianEmailSecondary: _parseFieldOptional(line, 7),
+    );
+
+    // Validar
+    row.validationError = row._validate();
+    return row;
+  }
+
+  static String _parseField(List<dynamic> line, int index) {
+    if (index >= line.length) return '';
+    final value = line[index];
+    return (value ?? '').toString().trim();
+  }
+
+  static String? _parseFieldOptional(List<dynamic> line, int index) {
+    final value = _parseField(line, index);
+    return value.isEmpty ? null : value;
+  }
+
+  String? _validate() {
+    if (studentName.isEmpty) return 'Nome do aluno obrigatório';
+    if (grade.isEmpty) return 'Série obrigatória';
+    if (className.isEmpty) return 'Turma obrigatória';
+    if (guardianName.isEmpty) return 'Nome do responsável obrigatório';
+    if (guardianEmail.isEmpty) return 'Email do responsável obrigatório';
+    if (!_isValidEmail(guardianEmail)) return 'Email do responsável inválido';
+    if (guardianPhone.isEmpty) return 'Telefone do responsável obrigatório';
+    return null;
+  }
+
+  static bool _isValidEmail(String email) {
+    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    return emailRegex.hasMatch(email);
+  }
+
+  Map<String, dynamic> toJson() => {
+        'student_name': studentName,
+        'grade': grade,
+        'class': className,
+        'guardian_name': guardianName,
+        'guardian_email': guardianEmail,
+        'guardian_phone': guardianPhone,
+        if (guardianPhoneSecondary != null && guardianPhoneSecondary!.isNotEmpty)
+          'guardian_phone_secondary': guardianPhoneSecondary,
+        if (guardianEmailSecondary != null && guardianEmailSecondary!.isNotEmpty)
+          'guardian_email_secondary': guardianEmailSecondary,
+      };
+}
+
 // ─── Student-Parent Link (Vínculo Aluno-Responsável) ─────────────────────────
 
 class StudentParentLink {

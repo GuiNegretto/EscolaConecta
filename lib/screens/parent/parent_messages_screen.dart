@@ -6,6 +6,7 @@ import '../../services/auth_provider.dart';
 import '../../services/theme_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/app_loading_error_widgets.dart';
 import 'parent_message_detail_screen.dart';
 import 'parent_profile_screen.dart';
 import 'parent_notifications_screen.dart';
@@ -159,7 +160,7 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen>
           Expanded(
             child: _loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: AppTheme.accentBlue))
+                    child: AppLoadingIndicator(size: 48, color: AppTheme.accentBlue))
                 : _filtered.isEmpty
                     ? const EmptyState(
                         icon: Icons.inbox_outlined,

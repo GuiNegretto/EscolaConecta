@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/credential_service.dart';
 import '../services/notification_service.dart';
 import '../screens/auth/role_selection_screen.dart';
 
@@ -53,6 +54,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Capture user's role before clearing
+    final userRole = _user?.role;
+    
     // Call notification service to remove token from server BEFORE clearing local token
     try {
       await NotificationService.instance.onUserLoggedOut();
@@ -62,6 +66,12 @@ class AuthProvider extends ChangeNotifier {
     
     // Clear local authentication token
     await _api.logout();
+    
+    // Clear password but keep email prefilled for convenience (if role available)
+    if (userRole != null) {
+      await CredentialService().clearPassword(userRole);
+    }
+    
     _user = null;
     _status = AuthStatus.unauthenticated;
     notifyListeners();

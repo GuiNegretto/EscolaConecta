@@ -25,9 +25,15 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        return macos;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for macos - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.windows:
-        return windows;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for windows - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -66,23 +72,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'pivotal-racer-496313-v2.firebasestorage.app',
     iosBundleId: 'com.example.escolaconecta',
   );
-
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyC-Dvl3BVI3OYa5pGSPROZ3t0p0ZWu2YNI',
-    appId: '1:188900793025:ios:021a4b1465006eb40bd240',
-    messagingSenderId: '188900793025',
-    projectId: 'teste-app-i-s-a-m-rwxibd',
-    storageBucket: 'teste-app-i-s-a-m-rwxibd.firebasestorage.app',
-    iosBundleId: 'com.example.escolaconecta',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDy3MgUBI4XweNkt9OHgXfWxTMxOcSTQhw',
-    appId: '1:188900793025:web:b9ac00e459725c140bd240',
-    messagingSenderId: '188900793025',
-    projectId: 'teste-app-i-s-a-m-rwxibd',
-    authDomain: 'teste-app-i-s-a-m-rwxibd.firebaseapp.com',
-    storageBucket: 'teste-app-i-s-a-m-rwxibd.firebasestorage.app',
-  );
-
 }
