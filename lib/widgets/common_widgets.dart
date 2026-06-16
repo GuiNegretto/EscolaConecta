@@ -17,17 +17,17 @@ class AppLogoHeader extends StatelessWidget {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            color: AppTheme.darkBg,
+            color: Theme.of(context).colorScheme.surface,
             shape: BoxShape.circle,
             border: Border.all(color: AppTheme.accentBlue.withOpacity(0.3), width: 2),
           ),
           child: const Icon(Icons.school_rounded, color: AppTheme.accentBlue, size: 40),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Escola Conecta',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 26,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.5,
@@ -56,9 +56,13 @@ class NewBadge extends StatelessWidget {
         color: Theme.of(context).colorScheme.secondary,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: const Text(
+      child: Text(
         'Nova',
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSecondary,
+        ),
       ),
     );
   }
@@ -289,9 +293,10 @@ class SectionHeader extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 17,
-                fontWeight: FontWeight.w600)),
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface)),
         if (trailing != null) trailing!,
       ],
     );
@@ -317,7 +322,7 @@ class LoadingOverlay extends StatelessWidget {
         child,
         if (isLoading)
           Container(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black54,
             child: const Center(
               child: CircularProgressIndicator(color: AppTheme.accentBlue),
             ),
