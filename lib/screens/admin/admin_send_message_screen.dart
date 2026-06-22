@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/models.dart';
+import '../../models/mensagem_destinatario.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/app_loading_error_widgets.dart';
+import '../../widgets/selecao_destinatario_widget.dart';
 
 class AdminSendMessageScreen extends StatefulWidget {
   final String? messageId;
@@ -121,16 +123,31 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
   // ── Validação do passo 1 (Conteúdo) ─────────────────────────────────────
 
   bool _validateStep1() {
-    if (!_formKey.currentState!.validate()) return false;
+    // Validar campos manualmente (não usar formKey quando não estiver no Step 0)
+    final title = _titleCtrl.text.trim();
+    final content = _contentCtrl.text.trim();
+    
+    if (title.isEmpty) {
+      _showError('Informe o título');
+      return false;
+    }
+    
+    if (content.isEmpty) {
+      _showError('Informe o conteúdo');
+      return false;
+    }
+    
     if (_selectedType == null) {
       _showError('Selecione o tipo de envio');
       return false;
     }
+    
     if (_selectedType == 'turma' &&
         (_targetClass == null || _targetClass == 'Todas as turmas')) {
       _showError('Escolha uma turma específica');
       return false;
     }
+    
     return true;
   }
 
@@ -195,9 +212,9 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Rascunho salvo com sucesso!'),
-            backgroundColor: Colors.blue,
+          SnackBar(
+            content: const Text('Rascunho salvo com sucesso!'),
+            backgroundColor: AppTheme.accentBlue,
           ),
         );
         Navigator.pop(context);
@@ -300,9 +317,9 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Rascunho salvo com sucesso!'),
-            backgroundColor: Colors.blue,
+          SnackBar(
+            content: const Text('Rascunho salvo com sucesso!'),
+            backgroundColor: AppTheme.accentBlue,
           ),
         );
         Navigator.pop(context);
@@ -343,8 +360,6 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           ? null 
           : _targetClass;
 
-
-
       final req = SendMessageRequest(
         title: title,
         content: content,
@@ -377,35 +392,58 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       if (confirm != true) return;
 
       // Save (create/update) first to get an ID, then call send endpoint
-      Message? saved;
       final editingMessage = _editingMessage;
+      Message? saved;
       
       try {
+        debugPrint('[SEND_NOW] Salvando mensagem antes de enviar...');
+        debugPrint('[SEND_NOW] Tipo: $selectedType');
+        debugPrint('[SEND_NOW] Turma: $targetClass');
+        debugPrint('[SEND_NOW] Título: $title');
+        
         if (editingMessage != null) {
+          debugPrint('[SEND_NOW] Atualizando mensagem existente ID: ${editingMessage.id}');
           saved = await _api.updateMessage(editingMessage.id, req);
         } else {
+          debugPrint('[SEND_NOW] Criando nova mensagem');
           saved = await _api.createMessage(req);
         }
-      } catch (e) {
+        
+        debugPrint('[SEND_NOW] Mensagem salva com sucesso');
+        debugPrint('[SEND_NOW] ID retornado: ${saved?.id}');
+      } catch (e, stackTrace) {
+        debugPrint('[SEND_NOW] ERRO ao salvar mensagem: $e');
+        debugPrint('[SEND_NOW] Stack trace: $stackTrace');
         throw 'Erro ao salvar mensagem: $e';
       }
 
-      if (saved.id.isEmpty) {
-        throw 'Erro ao obter ID da mensagem salva';
+      // Null safety check
+      if (saved == null) {
+        debugPrint('[SEND_NOW] ERRO: saved é null após createMessage/updateMessage');
+        throw 'Erro: A mensagem não foi salva corretamente (retorno null)';
       }
 
+      if (saved.id.isEmpty) {
+        debugPrint('[SEND_NOW] ERRO: saved.id está vazio');
+        throw 'Erro: ID da mensagem salva está vazio';
+      }
+
+      debugPrint('[SEND_NOW] Enviando mensagem ID: ${saved.id}');
       await _api.sendDraft(saved.id);
+      debugPrint('[SEND_NOW] Mensagem enviada com sucesso!');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mensagem enviada com sucesso!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Mensagem enviada com sucesso!'),
+            backgroundColor: AppTheme.success,
           ),
         );
         Navigator.pop(context);
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('[SEND_NOW] ERRO FINAL: $e');
+      debugPrint('[SEND_NOW] Stack trace final: $stackTrace');
       _showError('Erro ao enviar: $e');
     } finally {
       setState(() => _saving = false);
@@ -442,7 +480,11 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           : _targetClass;
       final scheduledAt = _scheduledTime;
 
-
+      // Validate scheduled time
+      if (scheduledAt == null) {
+        _showError('Selecione a data e hora para o agendamento');
+        return;
+      }
 
       final req = SendMessageRequest(
         title: title,
@@ -455,22 +497,42 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
 
       // Create or update with schedule (server will handle scheduling)
       final editingMessage = _editingMessage;
-      if (editingMessage != null) {
-        await _api.updateMessage(editingMessage.id, req);
-      } else {
-        await _api.createMessage(req);
+      Message? result;
+      
+      try {
+        debugPrint('[SCHEDULE] Agendando mensagem...');
+        debugPrint('[SCHEDULE] Tipo: $selectedType');
+        debugPrint('[SCHEDULE] Turma: $targetClass');
+        debugPrint('[SCHEDULE] Data agendada: $scheduledAt');
+        
+        if (editingMessage != null) {
+          debugPrint('[SCHEDULE] Atualizando mensagem existente ID: ${editingMessage.id}');
+          result = await _api.updateMessage(editingMessage.id, req);
+        } else {
+          debugPrint('[SCHEDULE] Criando nova mensagem agendada');
+          result = await _api.createMessage(req);
+        }
+        
+        debugPrint('[SCHEDULE] Mensagem agendada com sucesso');
+        debugPrint('[SCHEDULE] ID: ${result?.id}');
+      } catch (e, stackTrace) {
+        debugPrint('[SCHEDULE] ERRO ao agendar mensagem: $e');
+        debugPrint('[SCHEDULE] Stack trace: $stackTrace');
+        throw 'Erro ao agendar mensagem: $e';
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mensagem agendada com sucesso!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Mensagem agendada com sucesso!'),
+            backgroundColor: AppTheme.success,
           ),
         );
         Navigator.pop(context);
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('[SCHEDULE] ERRO FINAL: $e');
+      debugPrint('[SCHEDULE] Stack trace final: $stackTrace');
       _showError('Erro ao agendar: $e');
     } finally {
       setState(() => _saving = false);
@@ -483,7 +545,6 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       return Scaffold(
         appBar: AppBar(
           title: const Text('Editar Mensagem'),
-          backgroundColor: AppTheme.primaryBlue,
         ),
         body: const Center(
           child: AppLoadingIndicator(size: 48, color: AppTheme.accentBlue),
@@ -491,22 +552,20 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       );
     }
 
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Scaffold(
-      backgroundColor: AppTheme.darkBg,
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryBlue,
         title: Text(_editingMessage != null
             ? 'Editar Mensagem'
             : 'Nova Mensagem'),
-        elevation: 0,
-        leading: const BackButton(color: Colors.white),
         actions: [
           if (_currentStep == 0)
             TextButton(
               onPressed: _saving ? null : _saveDraft,
-              child: const Text(
+              child: Text(
                 'Salvar Rascunho',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: colorScheme.onPrimary),
               ),
             ),
         ],
@@ -557,7 +616,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
                 height: 2,
                 color: _currentStep > 0
                     ? AppTheme.primaryBlue
-                    : Colors.grey.withOpacity(0.3),
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
               ),
             ),
             _StepCircle(
@@ -571,7 +630,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
                 height: 2,
                 color: _currentStep > 1
                     ? AppTheme.primaryBlue
-                    : Colors.grey.withOpacity(0.3),
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
               ),
             ),
             _StepCircle(
@@ -607,18 +666,20 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
   }
 
   Widget _buildContentStep() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ─── Tipo de Envio ──────────────────────────────────────
-          const Text(
+          Text(
             'Tipo de Envio',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -646,12 +707,11 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           const SizedBox(height: 18),
 
           // ─── Turma/Destinatário ─────────────────────────────────
-          const Text(
+          Text(
             'Destinatários',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -689,18 +749,17 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           const SizedBox(height: 18),
 
           // ─── Título ──────────────────────────────────────────────
-          const Text(
+          Text(
             'Título da Mensagem',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           TextFormField(
             controller: _titleCtrl,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: colorScheme.onSurface),
             validator: (v) =>
                 v == null || v.isEmpty ? 'Informe o título' : null,
             decoration: InputDecoration(
@@ -713,19 +772,18 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           const SizedBox(height: 18),
 
           // ─── Conteúdo ────────────────────────────────────────────
-          const Text(
+          Text(
             'Conteúdo da Mensagem',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           TextFormField(
             controller: _contentCtrl,
             maxLines: 10,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: colorScheme.onSurface),
             onChanged: (_) => setState(() {}),
             validator: (v) =>
                 v == null || v.isEmpty ? 'Informe o conteúdo' : null,
@@ -754,19 +812,19 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           // ─── Dica ────────────────────────────────────────────────
           Container(
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
+              color: AppTheme.accentBlue.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.accentBlue.withOpacity(0.3)),
             ),
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                Icon(Icons.info, color: Colors.blue, size: 20),
+                Icon(Icons.info, color: AppTheme.accentBlue, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'A mensagem será salva como rascunho. Você poderá revisar, editar e agendar o envio.',
-                    style: TextStyle(fontSize: 12, color: Colors.blue),
+                    style: TextStyle(fontSize: 12, color: AppTheme.accentBlue),
                   ),
                 ),
               ],
@@ -877,19 +935,19 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         // ─── Próxima etapa ──────────────────────────────────────
         Container(
           decoration: BoxDecoration(
-            color: Colors.green.withOpacity(0.1),
+            color: AppTheme.success.withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.green.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.success.withOpacity(0.3)),
           ),
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 20),
+              Icon(Icons.check_circle, color: AppTheme.success, size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Tudo certo! Próxima etapa: agende ou envie agora.',
-                  style: TextStyle(fontSize: 12, color: Colors.green),
+                  style: TextStyle(fontSize: 12, color: AppTheme.success),
                 ),
               ),
             ],
@@ -949,7 +1007,10 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
                       const SizedBox(height: 2),
                       Text(
                         'A mensagem será enviada imediatamente',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(
+                          fontSize: 12, 
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -965,10 +1026,10 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           onTap: () => setState(() => _isScheduled = true),
           child: Container(
             decoration: BoxDecoration(
-              color: _isScheduled ? Colors.blue.withOpacity(0.1) : Theme.of(context).cardColor,
+              color: _isScheduled ? AppTheme.accentBlue.withOpacity(0.1) : Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: _isScheduled ? Colors.blue : Theme.of(context).dividerColor,
+                color: _isScheduled ? AppTheme.accentBlue : Theme.of(context).dividerColor,
                 width: _isScheduled ? 2 : 1,
               ),
             ),
@@ -994,7 +1055,10 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
                       const SizedBox(height: 2),
                       Text(
                         'Escolha a data e hora para envio automático',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(
+                          fontSize: 12, 
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -1038,7 +1102,9 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: _scheduledTime != null ? Colors.blue : Colors.grey,
+                            color: _scheduledTime != null 
+                                ? AppTheme.accentBlue 
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -1063,19 +1129,19 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           const SizedBox(height: 16),
           Container(
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
+              color: AppTheme.warning.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
             ),
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                Icon(Icons.schedule, color: Colors.orange, size: 20),
+                Icon(Icons.schedule, color: AppTheme.warning, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'A mensagem será enviada automaticamente no horário agendado',
-                    style: TextStyle(fontSize: 12, color: Colors.orange),
+                    style: TextStyle(fontSize: 12, color: AppTheme.warning),
                   ),
                 ),
               ],
@@ -1084,19 +1150,19 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         ] else
           Container(
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
+              color: AppTheme.warning.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
             ),
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                Icon(Icons.warning, color: Colors.orange, size: 20),
+                Icon(Icons.warning, color: AppTheme.warning, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'A mensagem será enviada imediatamente após confirmação',
-                    style: TextStyle(fontSize: 12, color: Colors.orange),
+                    style: TextStyle(fontSize: 12, color: AppTheme.warning),
                   ),
                 ),
               ],
@@ -1131,7 +1197,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
                       child: ElevatedButton(
                         onPressed: _saving ? null : () => setState(() => _currentStep--),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey,
+                          backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                           foregroundColor: Colors.white,
                         ),
                         child: const Text('← Voltar'),
@@ -1144,7 +1210,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
                       child: ElevatedButton(
                         onPressed: _saving ? null : _saveDraftOnly,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade600,
+                          backgroundColor: AppTheme.accentBlue,
                           foregroundColor: Colors.white,
                         ),
                         child: const Text('💾 Salvar Rascunho'),
@@ -1180,7 +1246,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
                           onPressed:
                               _saving ? null : () => setState(() => _currentStep--),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey,
+                            backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                             foregroundColor: Colors.white,
                           ),
                           child: const Text('← Voltar'),
@@ -1191,7 +1257,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
                         child: ElevatedButton(
                           onPressed: _saving ? null : () => Navigator.pop(context),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey,
+                            backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                           ),
                           child: const Text('Cancelar'),
                         ),
@@ -1248,10 +1314,10 @@ class _StepCircle extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: completed
-                ? Colors.green
+                ? AppTheme.success
                 : active
                     ? AppTheme.primaryBlue
-                    : Colors.grey.withOpacity(0.3),
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
           ),
           child: Center(
             child: completed
@@ -1271,7 +1337,9 @@ class _StepCircle extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 10,
-            color: active ? Colors.white : Colors.grey,
+            color: active 
+                ? Theme.of(context).colorScheme.onSurface 
+                : Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: active ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
@@ -1295,7 +1363,10 @@ class _ReviewInfoRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 12, color: Colors.grey),
+          style: TextStyle(
+            fontSize: 12, 
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         Text(
           value,

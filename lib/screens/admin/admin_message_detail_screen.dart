@@ -73,14 +73,14 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
             if (_message!.recipientCount != null)
               Text(
                 'Será enviado para ${_message!.recipientCount} destinatário(s)',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             if (_message!.scheduledAt != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   'Agendado para: ${DateFormat('dd/MM/yyyy HH:mm').format(_message!.scheduledAt!)}',
-                  style: TextStyle(fontSize: 12, color: Colors.blue),
+                  style: TextStyle(fontSize: 12, color: AppTheme.accentBlue),
                 ),
               ),
           ],
@@ -100,7 +100,7 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Mensagem enviada com sucesso!'),
-                          backgroundColor: Colors.green,
+                          backgroundColor: AppTheme.success,
                         ),
                       );
                       Navigator.pop(context);
@@ -135,7 +135,7 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
             child: const Text('Não'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
             onPressed: () async {
               Navigator.pop(ctx);
               setState(() => _sending = true);
@@ -146,7 +146,7 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Agendamento cancelado!'),
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppTheme.success,
                     ),
                   );
                   Navigator.pop(context);
@@ -197,7 +197,6 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
     final msg = _message!;
 
     return Scaffold(
-      backgroundColor: AppTheme.darkBg,
       appBar: AppBar(
         backgroundColor: AppTheme.primaryBlue,
         title: const Text('Detalhes da Mensagem'),
@@ -331,14 +330,14 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
                                     style: TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.green,
+                                      color: AppTheme.success,
                                     ),
                                   ),
                                   Text(
                                     'Enviadas',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey,
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
@@ -352,14 +351,14 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
                                     style: TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.red,
+                                      color: AppTheme.danger,
                                     ),
                                   ),
                                   Text(
                                     'Falhas',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey,
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
@@ -377,14 +376,14 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
                                     style: TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.orange,
+                                      color: AppTheme.warning,
                                     ),
                                   ),
                                   Text(
                                     'Pendentes',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey,
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
@@ -400,9 +399,9 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
                                 ? (msg.successCount! / msg.recipientCount!)
                                 : 0,
                             minHeight: 6,
-                            backgroundColor: Colors.grey.withOpacity(0.2),
+                            backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
                             valueColor:
-                                const AlwaysStoppedAnimation<Color>(Colors.green),
+                                const AlwaysStoppedAnimation<Color>(AppTheme.success),
                           ),
                         ),
                       ],
@@ -437,7 +436,7 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
                         icon: const Icon(Icons.arrow_back),
                         label: const Text('Voltar'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey,
+                          backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -450,7 +449,7 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
                           icon: const Icon(Icons.cancel),
                           label: const Text('Cancelar'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
+                            backgroundColor: AppTheme.danger,
                           ),
                         ),
                       ),

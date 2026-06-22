@@ -277,7 +277,6 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBg,
       appBar: AppBar(
         backgroundColor: AppTheme.primaryBlue,
         title: const Text('Importar Alunos e Responsáveis'),
@@ -331,7 +330,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
                   height: 48,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: isActive ? AppTheme.accentBlue : Colors.grey[700],
+                    color: isActive ? AppTheme.accentBlue : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
                   ),
                   child: Center(
                     child: isCurrent
@@ -355,7 +354,9 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
                   steps[i],
                   style: TextStyle(
                     fontSize: 12,
-                    color: isActive ? Colors.white : Colors.grey,
+                    color: isActive
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -395,10 +396,10 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
                   size: 56,
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Selecione seu arquivo CSV',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -407,7 +408,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
                 Text(
                   'Clique para selecionar',
                   style: TextStyle(
-                    color: Colors.grey[400],
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 14,
                   ),
                 ),
@@ -429,22 +430,22 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.15),
+              color: AppTheme.success.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.success.withOpacity(0.3)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.check_circle, color: Colors.green),
+                    const Icon(Icons.check_circle, color: AppTheme.success),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _fileName!,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -456,7 +457,10 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Tamanho: ${(fileSize / 1024).toStringAsFixed(2)} KB',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -491,7 +495,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
             const SizedBox(height: 16),
             Text(
               'Validando arquivo...',
-              style: TextStyle(color: Colors.grey[400]),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -506,19 +510,19 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.15),
+              color: AppTheme.danger.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.danger.withOpacity(0.3)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.error_outline, color: Colors.red),
+                const Icon(Icons.error_outline, color: AppTheme.danger),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     _error!,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -532,7 +536,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
             Text(
               'Erros encontrados:',
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -548,7 +552,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
               icon: const Icon(Icons.close),
               label: const Text('Recomeçar'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.withOpacity(0.8),
+                backgroundColor: AppTheme.danger.withOpacity(0.8),
                 minimumSize: const Size.fromHeight(48),
               ),
             ),
@@ -565,21 +569,21 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.15),
+              color: AppTheme.success.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.success.withOpacity(0.3)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.check_circle, color: Colors.green),
+                    const Icon(Icons.check_circle, color: AppTheme.success),
                     const SizedBox(width: 12),
                     Text(
                       'Arquivo validado!',
                       style: TextStyle(
-                        color: Colors.green[200],
+                        color: AppTheme.success,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -589,7 +593,10 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
                 const SizedBox(height: 12),
                 Text(
                   '${_csvData!.length} registros prontos para importar',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -598,7 +605,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
           Text(
             'Preview:',
             style: TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -643,7 +650,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
         Text(
           'Enviando arquivo...',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -654,14 +661,17 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
           child: LinearProgressIndicator(
             value: _uploadProgress,
             minHeight: 8,
-            backgroundColor: Colors.grey[700],
+            backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.15),
             valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.accentBlue),
           ),
         ),
         const SizedBox(height: 8),
         Text(
           '${(_uploadProgress * 100).toStringAsFixed(0)}%',
-          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 12,
+          ),
         ),
       ],
     );
@@ -681,20 +691,20 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: result.totalErrors == 0
-                ? Colors.green.withOpacity(0.15)
-                : Colors.orange.withOpacity(0.15),
+                ? AppTheme.success.withOpacity(0.15)
+                : AppTheme.warning.withOpacity(0.15),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: result.totalErrors == 0
-                  ? Colors.green.withOpacity(0.3)
-                  : Colors.orange.withOpacity(0.3),
+                  ? AppTheme.success.withOpacity(0.3)
+                  : AppTheme.warning.withOpacity(0.3),
             ),
           ),
           child: Row(
             children: [
               Icon(
                 result.totalErrors == 0 ? Icons.check_circle : Icons.info,
-                color: result.totalErrors == 0 ? Colors.green : Colors.orange,
+                color: result.totalErrors == 0 ? AppTheme.success : AppTheme.warning,
                 size: 32,
               ),
               const SizedBox(width: 16),
@@ -704,7 +714,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
                       ? 'Sucesso!'
                       : 'Concluído com avisos',
                   style: TextStyle(
-                    color: result.totalErrors == 0 ? Colors.green[200] : Colors.orange[200],
+                    color: result.totalErrors == 0 ? AppTheme.success : AppTheme.warning,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -720,7 +730,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
           Text(
             'Erros:',
             style: TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -767,10 +777,10 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
       children: [
-        _buildStatCard('Processado', result.totalProcessed.toString(), Colors.blue),
-        _buildStatCard('Importados', result.totalImported.toString(), Colors.green),
-        _buildStatCard('Ignorados', result.totalIgnored.toString(), Colors.orange),
-        _buildStatCard('Erros', result.totalErrors.toString(), Colors.red),
+        _buildStatCard('Processado', result.totalProcessed.toString(), AppTheme.accentBlue),
+        _buildStatCard('Importados', result.totalImported.toString(), AppTheme.success),
+        _buildStatCard('Ignorados', result.totalIgnored.toString(), AppTheme.warning),
+        _buildStatCard('Erros', result.totalErrors.toString(), AppTheme.danger),
       ],
     );
   }
@@ -798,7 +808,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey[400],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
             textAlign: TextAlign.center,
@@ -814,7 +824,8 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        headingRowColor: MaterialStateProperty.all(Colors.grey[800]),
+        headingRowColor: MaterialStateProperty.all(
+            Theme.of(context).colorScheme.surfaceVariant),
         dataRowHeight: 56,
         columns: const [
           DataColumn(label: Text('Aluno')),
@@ -840,7 +851,8 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        headingRowColor: MaterialStateProperty.all(Colors.grey[800]),
+        headingRowColor: MaterialStateProperty.all(
+            Theme.of(context).colorScheme.surfaceVariant),
         dataRowHeight: 60,
         columns: const [
           DataColumn(label: Text('Linha')),
@@ -859,7 +871,7 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
                       error.validationError ?? 'Erro',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.red),
+                      style: const TextStyle(color: AppTheme.danger),
                     ),
                   ),
                 ),
@@ -880,10 +892,10 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Formato do CSV',
             style: TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
@@ -927,11 +939,18 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
               children: [
                 Text(
                   field,
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 Text(
                   description,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),

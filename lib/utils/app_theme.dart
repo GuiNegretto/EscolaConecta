@@ -7,6 +7,7 @@ class AppTheme {
   static const Color success = Color(0xFF28A745);
   static const Color warning = Color(0xFFFFC107);
   static const Color danger = Color(0xFFDC3545);
+  static const Color purple = Color(0xFF7B2FBE);
 
   // ── LIGHT COLORS ───────────────────────────────────────────────────────────
   static const Color lightBg = Colors.white;

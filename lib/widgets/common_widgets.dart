@@ -100,6 +100,7 @@ class MessageCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: message.isNew ? FontWeight.w700 : FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       if (message.isNew) ...[
@@ -190,9 +191,10 @@ class AdminMessageCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   message.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600),
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -366,9 +368,10 @@ class AppTextField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w500)),
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface)),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
@@ -377,7 +380,7 @@ class AppTextField extends StatelessWidget {
           maxLines: maxLines,
           onChanged: onChanged,
           validator: validator,
-          style: const TextStyle(),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: prefixIcon,
@@ -412,9 +415,10 @@ class EmptyState extends StatelessWidget {
           Icon(icon, size: 64, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
           const SizedBox(height: 16),
           Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w600)),
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface)),
           const SizedBox(height: 8),
           Text(subtitle,
               textAlign: TextAlign.center,

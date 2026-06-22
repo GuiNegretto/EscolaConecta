@@ -1,4 +1,6 @@
 
+import 'package:flutter/foundation.dart';
+
 // ─── User / Auth ───────────────────────────────────────────────────────────
 
 enum UserRole { admin, parent }
@@ -347,7 +349,7 @@ class ImportError {
 
   factory ImportError.fromJson(Map<String, dynamic> json) {
     return ImportError(
-      row: json['row'] ?? 0,
+      row: ImportResult._asInt(json['row']),
       field: json['field'] ?? json['column'] ?? '',
       message: json['message'] ?? '',
     );
@@ -384,13 +386,51 @@ class ImportResult {
         [];
 
     return ImportResult(
-      totalProcessed: json['total_processed'] ?? json['total'] ?? 0,
-      totalImported: json['total_imported'] ?? json['imported'] ?? 0,
-      totalIgnored: json['total_ignored'] ?? json['ignored'] ?? 0,
-      totalErrors: json['total_errors'] ?? json['failed'] ?? errorsList.length,
+      totalProcessed: _asInt(json['total_processed'] ?? json['total']),
+      totalImported: _asInt(json['total_imported'] ?? json['imported']),
+      totalIgnored: _asInt(json['total_ignored'] ?? json['ignored']),
+      totalErrors: _asInt(
+        json['total_errors'] ?? json['failed'],
+        fallback: errorsList.length,
+      ),
       errors: errorsList,
-      importedAt: json['imported_at'] != null ? DateTime.tryParse(json['imported_at']) : DateTime.now(),
+      importedAt: json['imported_at'] != null
+          ? DateTime.tryParse(json['imported_at'].toString())
+          : DateTime.now(),
     );
+  }
+
+  /// Converte dinamicamente qualquer valor para `int` de forma segura.
+  ///
+  /// Foi adicionada para evitar `TypeError: type '_JsonMap' is not a subtype
+  /// of type 'int'` quando o backend retorna um objeto/Map em um campo que o
+  /// app espera como número (ex: `"total": { "students": 10 }`).
+  ///
+  /// Comportamento:
+  /// - `null` ou ausente → [fallback] (padrão `0`)
+  /// - `int` → retorna direto
+  /// - `double` → converte com `.toInt()`
+  /// - `String` numérica (`"10"`) → `int.tryParse` ou [fallback]
+  /// - `bool` → `1` se `true`, caso contrário [fallback]
+  /// - `Map` / List / outro tipo inesperado → loga um warning e retorna
+  ///   [fallback] (NUNCA lança TypeError).
+  static int _asInt(dynamic value, {int fallback = 0}) {
+    if (value == null) return fallback;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? fallback;
+    if (value is bool) return value ? 1 : fallback;
+
+    // Formato inesperado (Map/Lista/etc.). Loga e usa fallback em vez de
+    // quebrar a tela com TypeError.
+    // ignore: avoid_print
+    debugPrint(
+      '[ImportResult] Campo numérico veio em formato inesperado: '
+      '$value (${value.runtimeType}) — usando fallback=$fallback. '
+      'Verifique o JSON retornado pelo backend.',
+    );
+    return fallback;
   }
 
   Map<String, dynamic> toJson() => {

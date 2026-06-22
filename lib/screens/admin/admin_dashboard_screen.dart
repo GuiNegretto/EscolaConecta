@@ -133,7 +133,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final filteredMessages = _getFilteredMessages();
 
     return Scaffold(
-      backgroundColor: AppTheme.darkBg,
       appBar: AppBar(
         backgroundColor: AppTheme.primaryBlue,
         automaticallyImplyLeading: false,
@@ -235,21 +234,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               label: 'Rascunhos',
               count: stats['drafts'] ?? 0,
               icon: Icons.edit,
-              color: Colors.grey,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               onTap: () => setState(() => _selectedFilter = 'Rascunhos'),
             ),
             SummaryCard(
               label: 'Agendadas',
               count: stats['scheduled'] ?? 0,
               icon: Icons.schedule,
-              color: Colors.blue,
+              color: AppTheme.accentBlue,
               onTap: () => setState(() => _selectedFilter = 'Agendadas'),
             ),
             SummaryCard(
               label: 'Enviadas Hoje',
               count: stats['sent_today'] ?? 0,
               icon: Icons.check_circle,
-              color: Colors.green,
+              color: AppTheme.success,
               onTap: () => setState(() => _selectedFilter = 'Enviadas'),
             ),
             SummaryCard(
@@ -262,7 +261,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               label: 'Falhas',
               count: stats['failed'] ?? 0,
               icon: Icons.error,
-              color: Colors.red,
+              color: AppTheme.danger,
             ),
           ],
         ),
@@ -303,7 +302,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             QuickAccessButton(
               icon: Icons.person_add_outlined,
               label: 'Cadastrar Pai',
-              color: Colors.blue,
+              color: AppTheme.accentBlue,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -313,7 +312,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             QuickAccessButton(
               icon: Icons.school_outlined,
               label: 'Cadastrar Aluno',
-              color: Colors.green,
+              color: AppTheme.success,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -323,7 +322,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             QuickAccessButton(
               icon: Icons.link,
               label: 'Gerenciar Vínculos',
-              color: Colors.purple,
+              color: AppTheme.purple,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -334,7 +333,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             QuickAccessButton(
               icon: Icons.upload_file_outlined,
               label: 'Importar',
-              color: Colors.orange,
+              color: AppTheme.warning,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AdminImportScreen()),
@@ -384,7 +383,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         TabBar(
           controller: _tabController,
           labelColor: AppTheme.primaryBlue,
-          unselectedLabelColor: Colors.grey,
+          unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
           tabs: const [
             Tab(text: 'Rascunhos'),
             Tab(text: 'Enviadas'),
@@ -482,7 +481,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       shape: BoxShape.circle,
                     ),
                     child: const CircleAvatar(
-                      backgroundColor: AppTheme.darkBg,
+                      backgroundColor: AppTheme.primaryBlue,
                       radius: 24,
                       child: Icon(Icons.shield_outlined,
                           color: AppTheme.accentBlue, size: 26),
