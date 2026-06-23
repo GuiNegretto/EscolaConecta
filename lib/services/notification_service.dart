@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -123,7 +123,9 @@ class NotificationService {
         },
         body: jsonEncode({
           'token': token,
-          'platform': Platform.isAndroid ? 'android' : 'ios',
+          'platform': kIsWeb 
+              ? 'web' 
+              : (defaultTargetPlatform == TargetPlatform.android ? 'android' : 'ios'),
         }),
       );
       debugPrint('[FCM] Token enviado ao servidor');
