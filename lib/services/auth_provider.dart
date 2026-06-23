@@ -41,6 +41,16 @@ class AuthProvider extends ChangeNotifier {
       _user = await _api.login(email, password, role, remember: remember);
       _status = AuthStatus.authenticated;
       notifyListeners();
+      
+      // Registra token FCM no servidor após login bem-sucedido
+      try {
+        await NotificationService.instance.onUserLoggedIn();
+        debugPrint('[Auth] Token FCM registrado após login');
+      } catch (e) {
+        debugPrint('[Auth] Erro ao registrar token FCM: $e');
+        // Não falha o login se o registro do token falhar
+      }
+      
       return true;
     } on ApiException catch (e) {
       _error = e.message;

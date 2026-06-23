@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "157007901610",
+    "project_id": "pivotal-racer-496313-v2",
+    "storage_bucket": "pivotal-racer-496313-v2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:157007901610:android:1b75820d41509ca2fd71d3",
+        "android_client_info": {
+          "package_name": "com.example.escolaconecta"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqtQg_raesE7Dsk0D1J1q5a8_2xCv6oaM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

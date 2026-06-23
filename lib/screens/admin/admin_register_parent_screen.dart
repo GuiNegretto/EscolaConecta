@@ -23,6 +23,10 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
   late TextEditingController _emailCtrl;
   late TextEditingController _cpfCtrl;
   late TextEditingController _phoneCtrl;
+  
+  // Search functionality
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -32,11 +36,14 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
     _emailCtrl = TextEditingController();
     _cpfCtrl = TextEditingController();
     _phoneCtrl = TextEditingController();
+    _searchController.addListener(_onSearchChanged);
     _loadParents();
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _cpfCtrl.dispose();
@@ -59,6 +66,61 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase().trim();
+    });
+  }
+
+  List<Parent> _filterParents(List<Parent> lista) {
+    if (_searchQuery.isEmpty) return lista;
+    
+    return lista.where((p) {
+      // Busca por nome
+      final nomeMatch = p.name.toLowerCase().contains(_searchQuery);
+      
+      // Busca por telefone (apenas se a query contém dígitos)
+      final queryDigits = _searchQuery.replaceAll(RegExp(r'\D'), '');
+      final telefoneMatch = queryDigits.isNotEmpty && 
+          p.phone.replaceAll(RegExp(r'\D'), '').contains(queryDigits);
+      
+      // Busca por CPF (apenas se a query contém dígitos)
+      final cpfMatch = queryDigits.isNotEmpty && 
+          (p.cpf ?? '').replaceAll(RegExp(r'\D'), '').contains(queryDigits);
+      
+      return nomeMatch || telefoneMatch || cpfMatch;
+    }).toList();
+  }
+
+  Widget _buildHighlightedText(String text, String query) {
+    if (query.isEmpty) return Text(text);
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    final index = lowerText.indexOf(lowerQuery);
+    if (index == -1) return Text(text);
+
+    // Pega o estilo base do tema para manter tamanho consistente
+    final baseStyle = Theme.of(context).textTheme.bodyLarge ?? const TextStyle();
+
+    return RichText(
+      text: TextSpan(
+        style: baseStyle,
+        children: [
+          TextSpan(text: text.substring(0, index)),
+          TextSpan(
+            text: text.substring(index, index + query.length),
+            style: baseStyle.copyWith(
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(text: text.substring(index + query.length)),
+        ],
+      ),
+    );
   }
 
   Future<void> _saveParent() async {
@@ -175,7 +237,7 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
     _nameCtrl.text = parent.name;
     _emailCtrl.text = parent.email;
     _cpfCtrl.text = parent.cpf ?? '';
-    _phoneCtrl.text = parent.phone ?? '';
+    _phoneCtrl.text = parent.phone;
 
     showDialog(
       context: context,
@@ -248,6 +310,8 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredParents = _filterParents(_parents);
+
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
       appBar: AppBar(
@@ -267,53 +331,102 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
           ),
         ],
       ),
-      body: _loading && _parents.isEmpty
-          ? const Center(
-              child: AppLoadingIndicator(size: 48, color: AppTheme.accentBlue),
-            )
-          : _parents.isEmpty
-              ? Center(
-                  child: EmptyState(
-                    icon: Icons.people_outline,
-                    title: 'Nenhum guardião',
-                    subtitle: 'Nenhum guardião cadastrado ainda.',
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadParents,
-                  child: ListView.builder(
-                    itemCount: _parents.length,
-                    itemBuilder: (ctx, idx) {
-                      final parent = _parents[idx];
-                      return Container(
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(10),
+      body: Column(
+        children: [
+          // Search field
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Buscar por nome ou número...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        tooltip: 'Limpar busca',
+                        onPressed: () {
+                          _searchController.clear();
+                          FocusScope.of(context).unfocus();
+                        },
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          // Content
+          Expanded(
+            child: _loading && _parents.isEmpty
+                ? const Center(
+                    child: AppLoadingIndicator(size: 48, color: AppTheme.accentBlue),
+                  )
+                : _parents.isEmpty
+                    ? Center(
+                        child: EmptyState(
+                          icon: Icons.people_outline,
+                          title: 'Nenhum guardião',
+                          subtitle: 'Nenhum guardião cadastrado ainda.',
                         ),
-                        child: ListTile(
-                          title: Text(parent.name),
-                          subtitle: Text(parent.email),
-                          trailing: PopupMenuButton(
-                            itemBuilder: (ctx) => [
-                              PopupMenuItem(
-                                child: const Text('Editar'),
-                                onTap: () => _editParent(parent),
-                              ),
-                              PopupMenuItem(
-                                child: const Text('Excluir',
-                                    style: TextStyle(color: AppTheme.danger)),
-                                onTap: () => _deleteParent(parent.id),
-                              ),
-                            ],
+                      )
+                    : filteredParents.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.search_off,
+                                  size: 48,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Nenhum resultado para "$_searchQuery".',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _loadParents,
+                            child: ListView.builder(
+                              itemCount: filteredParents.length,
+                              itemBuilder: (ctx, idx) {
+                                final parent = filteredParents[idx];
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).cardColor,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: ListTile(
+                                    title: _buildHighlightedText(parent.name, _searchQuery),
+                                    subtitle: Text('${parent.phone} • ${parent.email}'),
+                                    trailing: PopupMenuButton(
+                                      itemBuilder: (ctx) => [
+                                        PopupMenuItem(
+                                          child: const Text('Editar'),
+                                          onTap: () => _editParent(parent),
+                                        ),
+                                        PopupMenuItem(
+                                          child: const Text('Excluir',
+                                              style: TextStyle(color: AppTheme.danger)),
+                                          onTap: () => _deleteParent(parent.id),
+                                        ),
+                                      ],
+                                    ),
+                                    onTap: () => _editParent(parent),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
-                          onTap: () => _editParent(parent),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+          ),
+        ],
+      ),
     );
   }
 }
