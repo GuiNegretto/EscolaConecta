@@ -54,18 +54,26 @@ class NotificationService {
       return;
     }
 
+    debugPrint('[FCM] ===== INICIANDO INICIALIZAÇÃO =====');
+    
     try {
       // Inicializar Firebase Messaging APENAS se Firebase Core estiver pronto
       // e NÃO estiver na web (web usa service worker)
       if (!kIsWeb) {
-        // Aguardar um tick para garantir que Firebase Core está completamente pronto
-        await Future.delayed(const Duration(milliseconds: 300));
-        _fcm = FirebaseMessaging.instance;
-        debugPrint('[FCM] FirebaseMessaging.instance criado');
+        debugPrint('[FCM] Plataforma: ${defaultTargetPlatform.toString()}');
         
-        // Aguardar FCM estar pronto antes de continuar (aumentado para 500ms)
+        // Aguardar um tick para garantir que Firebase Core está completamente pronto
+        debugPrint('[FCM] Aguardando 300ms para Firebase Core estar pronto...');
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        debugPrint('[FCM] Criando FirebaseMessaging.instance...');
+        _fcm = FirebaseMessaging.instance;
+        debugPrint('[FCM] ✅ FirebaseMessaging.instance criado com sucesso');
+        
+        // Aguardar FCM estar pronto antes de continuar
+        debugPrint('[FCM] Aguardando mais 500ms para FCM estabilizar...');
         await Future.delayed(const Duration(milliseconds: 500));
-        debugPrint('[FCM] Aguardando FCM ficar completamente pronto...');
+        debugPrint('[FCM] ✅ Delays completados');
       } else {
         debugPrint('[FCM] Web detectada, usando service worker');
         // Na web, o Firebase Messaging é gerenciado pelo service worker
@@ -74,19 +82,24 @@ class NotificationService {
 
       // 1. Permissões (Android 13+ e iOS) - só se não for web
       if (!kIsWeb && _fcm != null) {
+        debugPrint('[FCM] Solicitando permissões...');
         await _requestPermission();
+        debugPrint('[FCM] ✅ Permissões solicitadas');
       }
 
       // 2. Criar canal Android - só se for Android
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        debugPrint('[FCM] Criando canal de notificação Android...');
         await _localNotif
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>()
             ?.createNotificationChannel(_channel);
+        debugPrint('[FCM] ✅ Canal Android criado');
       }
 
       // 3. Configurar flutter_local_notifications - só se não for web
       if (!kIsWeb) {
+        debugPrint('[FCM] Inicializando flutter_local_notifications...');
         const androidInit =
             AndroidInitializationSettings('@mipmap/ic_launcher');
         const initSettings = InitializationSettings(android: androidInit);
@@ -94,10 +107,12 @@ class NotificationService {
           initSettings,
           onDidReceiveNotificationResponse: _onLocalNotifTap,
         );
+        debugPrint('[FCM] ✅ flutter_local_notifications inicializado');
       }
 
       // 4. Foreground: FCM não exibe banner sozinho — fazemos via local notif
       if (!kIsWeb) {
+        debugPrint('[FCM] Configurando listeners de mensagens...');
         FirebaseMessaging.onMessage.listen(_handleForeground);
 
         // 5. Background tap — app estava em background e usuário tocou
@@ -106,29 +121,40 @@ class NotificationService {
         // 6. App aberto a partir de notificação (estava morto)
         if (_fcm != null) {
           final initial = await _fcm!.getInitialMessage();
-          if (initial != null) _handleTap(initial);
+          if (initial != null) {
+            debugPrint('[FCM] App aberto via notificação inicial');
+            _handleTap(initial);
+          }
 
           // 7. Registrar token no servidor sempre que renovar
           _fcm!.onTokenRefresh.listen(_sendTokenToServer);
         }
+        debugPrint('[FCM] ✅ Listeners configurados');
       }
 
       // 8. Enviar token atual na inicialização (com verificação e retry)
       if (!kIsWeb && _fcm != null) {
-        debugPrint('[FCM] Tentando obter token...');
+        debugPrint('[FCM] Tentando obter token FCM...');
         final token = await _getTokenWithRetry();
         if (token != null) {
+          debugPrint('[FCM] ✅ Token obtido: ${token.substring(0, 20)}...');
           await _sendTokenToServer(token);
         } else {
-          debugPrint('[FCM] Não foi possível obter token após tentativas');
+          debugPrint('[FCM] ⚠️ Não foi possível obter token após tentativas');
         }
       }
 
       _isInitialized = true;
-      debugPrint('[FCM] Inicialização concluída com sucesso');
-    } catch (e) {
-      debugPrint('[FCM] Erro na inicialização: $e');
-      // Não throw - permite que o app continue funcionando
+      debugPrint('[FCM] ===== ✅ INICIALIZAÇÃO CONCLUÍDA COM SUCESSO =====');
+    } catch (e, stackTrace) {
+      debugPrint('[FCM] ===== ❌ ERRO NA INICIALIZAÇÃO =====');
+      debugPrint('[FCM] Erro: $e');
+      debugPrint('[FCM] StackTrace: $stackTrace');
+      
+      // IMPORTANTE: Marcar como inicializado mesmo com erro
+      // para não ficar travado eternamente
+      _isInitialized = true;
+      debugPrint('[FCM] Marcado como inicializado (com erro) para não bloquear o app');
     }
   }
 
@@ -219,24 +245,46 @@ class NotificationService {
 
   // Chama isso após o login para garantir que o token está atualizado
   Future<void> onUserLoggedIn() async {
+    debugPrint('[Auth] onUserLoggedIn chamado');
+    
     // Aguardar o FCM estar inicializado antes de tentar obter o token
     int attempts = 0;
     const maxAttempts = 10;
     const delayMs = 500;
     
     while (!_isInitialized && attempts < maxAttempts) {
-      debugPrint('[FCM] Aguardando inicialização... (tentativa ${attempts + 1}/$maxAttempts)');
+      debugPrint('[Auth] Aguardando FCM inicializar... (tentativa ${attempts + 1}/$maxAttempts)');
       await Future.delayed(const Duration(milliseconds: delayMs));
       attempts++;
     }
     
     if (!_isInitialized) {
-      debugPrint('[FCM] onUserLoggedIn: FCM não inicializado após ${maxAttempts * delayMs}ms');
-      return;
+      debugPrint('[Auth] ⚠️ FCM não inicializado após ${maxAttempts * delayMs}ms');
+      debugPrint('[Auth] Tentando inicializar novamente (lazy initialization)...');
+      
+      // Tentar inicializar novamente
+      try {
+        await initialize();
+      } catch (e) {
+        debugPrint('[Auth] Erro ao tentar reinicializar: $e');
+      }
+      
+      // Verificar se agora está inicializado
+      if (!_isInitialized) {
+        debugPrint('[Auth] ❌ FCM ainda não está pronto, pulando registro de token');
+        return;
+      }
     }
     
+    debugPrint('[Auth] ✅ FCM inicializado, obtendo token...');
     final token = await getToken();
-    if (token != null) await _sendTokenToServer(token);
+    if (token != null) {
+      debugPrint('[Auth] ✅ Token obtido, enviando ao servidor...');
+      await _sendTokenToServer(token);
+      debugPrint('[Auth] ✅ Token FCM registrado após login');
+    } else {
+      debugPrint('[Auth] ⚠️ Não foi possível obter token FCM');
+    }
   }
 
   // Chama isso no logout para remover o token do servidor
