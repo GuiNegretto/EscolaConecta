@@ -30,7 +30,6 @@ dependencies:
   firebase_messaging: ^15.1.0
   flutter_local_notifications: ^17.2.2
   web: ^1.1.1
-  file_picker: ^8.0.0+1
   image_picker: ^1.0.7
 
 dev_dependencies:
