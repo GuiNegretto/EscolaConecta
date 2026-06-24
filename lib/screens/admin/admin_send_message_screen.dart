@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import '../../models/models.dart';
 import '../../models/mensagem_destinatario.dart';
 import '../../services/api_service.dart';
@@ -37,6 +39,10 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
   // Turmas carregadas dinamicamente do back-end
   List<String> _classes = [];
   bool _loadingClasses = false;
+
+  // Arquivos anexados
+  List<PlatformFile> _selectedFiles = [];
+  bool _pickingFiles = false;
 
   final _types = [
     ('Geral', 'geral'),
@@ -165,6 +171,81 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
     );
   }
 
+  // ── Selecionar Arquivos ─────────────────────────────────────────────────
+  Future<void> _pickFiles() async {
+    setState(() => _pickingFiles = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'pdf', 'doc', 'docx'],
+      );
+
+      if (result != null) {
+        setState(() {
+          _selectedFiles.addAll(result.files);
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${result.files.length} arquivo(s) selecionado(s)'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      _showError('Erro ao selecionar arquivos: $e');
+    } finally {
+      setState(() => _pickingFiles = false);
+    }
+  }
+
+  void _removeFile(int index) {
+    setState(() {
+      _selectedFiles.removeAt(index);
+    });
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  Widget _buildFileIcon(String extension) {
+    IconData icon;
+    Color color;
+
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+        icon = Icons.image;
+        color = AppTheme.accentBlue;
+        break;
+      case 'mp4':
+      case 'mov':
+        icon = Icons.videocam;
+        color = Colors.purple;
+        break;
+      case 'pdf':
+        icon = Icons.picture_as_pdf;
+        color = Colors.red;
+        break;
+      case 'doc':
+      case 'docx':
+        icon = Icons.description;
+        color = Colors.blue;
+        break;
+      default:
+        icon = Icons.attach_file;
+        color = Colors.grey;
+    }
+
+    return Icon(icon, color: color, size: 32);
+  }
+
   // ── Salvar como Rascunho ─────────────────────────────────────────────────
 
   Future<void> _saveDraft() async {
@@ -203,11 +284,17 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         scheduledAt: _isScheduled ? _scheduledTime : null,
       );
 
+      // Converter PlatformFile para paths (apenas mobile/desktop)
+      final filePaths = _selectedFiles
+          .where((f) => f.path != null)
+          .map((f) => f.path!)
+          .toList();
+
       final editingMessage = _editingMessage;
       if (editingMessage != null) {
-        await _api.updateMessage(editingMessage.id, req);
+        await _api.updateMessage(editingMessage.id, req, filePaths: filePaths.isNotEmpty ? filePaths : null);
       } else {
-        await _api.createMessage(req);
+        await _api.createMessage(req, filePaths: filePaths.isNotEmpty ? filePaths : null);
       }
 
       if (mounted) {
@@ -807,6 +894,84 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
               ),
             ),
           ),
+          const SizedBox(height: 20),
+
+          // ─── Anexos ──────────────────────────────────────────────
+          Text(
+            'Anexos (Opcional)',
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Botão adicionar arquivo
+          OutlinedButton.icon(
+            onPressed: _pickingFiles ? null : _pickFiles,
+            icon: _pickingFiles 
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.attach_file),
+            label: Text(_pickingFiles ? 'Selecionando...' : 'Adicionar Arquivos'),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: AppTheme.accentBlue),
+              foregroundColor: AppTheme.accentBlue,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            ),
+          ),
+          
+          // Lista de arquivos selecionados
+          if (_selectedFiles.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...List.generate(_selectedFiles.length, (index) {
+              final file = _selectedFiles[index];
+              final extension = file.extension ?? '';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                ),
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    _buildFileIcon(extension),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            file.name,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _formatFileSize(file.size),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      color: AppTheme.danger,
+                      onPressed: () => _removeFile(index),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
           const SizedBox(height: 20),
 
           // ─── Dica ────────────────────────────────────────────────

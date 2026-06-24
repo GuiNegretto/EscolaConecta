@@ -59,12 +59,13 @@ class NotificationService {
       // e NÃO estiver na web (web usa service worker)
       if (!kIsWeb) {
         // Aguardar um tick para garantir que Firebase Core está completamente pronto
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 300));
         _fcm = FirebaseMessaging.instance;
         debugPrint('[FCM] FirebaseMessaging.instance criado');
         
-        // Aguardar FCM estar pronto antes de continuar
-        await Future.delayed(const Duration(milliseconds: 200));
+        // Aguardar FCM estar pronto antes de continuar (aumentado para 500ms)
+        await Future.delayed(const Duration(milliseconds: 500));
+        debugPrint('[FCM] Aguardando FCM ficar completamente pronto...');
       } else {
         debugPrint('[FCM] Web detectada, usando service worker');
         // Na web, o Firebase Messaging é gerenciado pelo service worker
@@ -112,9 +113,16 @@ class NotificationService {
         }
       }
 
-      // 8. Enviar token atual na inicialização
-      final token = await getToken();
-      if (token != null) await _sendTokenToServer(token);
+      // 8. Enviar token atual na inicialização (com verificação e retry)
+      if (!kIsWeb && _fcm != null) {
+        debugPrint('[FCM] Tentando obter token...');
+        final token = await _getTokenWithRetry();
+        if (token != null) {
+          await _sendTokenToServer(token);
+        } else {
+          debugPrint('[FCM] Não foi possível obter token após tentativas');
+        }
+      }
 
       _isInitialized = true;
       debugPrint('[FCM] Inicialização concluída com sucesso');
@@ -151,6 +159,36 @@ class NotificationService {
       debugPrint('[FCM] getToken error: $e');
       return null;
     }
+  }
+
+  // Tenta obter token com retry (máximo 3 tentativas)
+  Future<String?> _getTokenWithRetry({int maxAttempts = 3}) async {
+    if (_fcm == null) {
+      debugPrint('[FCM] _getTokenWithRetry: FCM não inicializado');
+      return null;
+    }
+
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        debugPrint('[FCM] Tentativa $attempt de $maxAttempts para obter token');
+        final token = await _fcm!.getToken();
+        if (token != null) {
+          debugPrint('[FCM] Token obtido com sucesso na tentativa $attempt');
+          return token;
+        }
+        debugPrint('[FCM] Token null na tentativa $attempt');
+      } catch (e) {
+        debugPrint('[FCM] Erro na tentativa $attempt: $e');
+      }
+
+      // Aguardar antes de tentar novamente (exceto na última tentativa)
+      if (attempt < maxAttempts) {
+        await Future.delayed(Duration(milliseconds: 500 * attempt));
+      }
+    }
+
+    debugPrint('[FCM] Não foi possível obter token após $maxAttempts tentativas');
+    return null;
   }
 
   Future<void> _sendTokenToServer(String token) async {
