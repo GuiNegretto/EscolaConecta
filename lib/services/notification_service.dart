@@ -58,8 +58,13 @@ class NotificationService {
       // Inicializar Firebase Messaging APENAS se Firebase Core estiver pronto
       // e NÃO estiver na web (web usa service worker)
       if (!kIsWeb) {
+        // Aguardar um tick para garantir que Firebase Core está completamente pronto
+        await Future.delayed(const Duration(milliseconds: 100));
         _fcm = FirebaseMessaging.instance;
         debugPrint('[FCM] FirebaseMessaging.instance criado');
+        
+        // Aguardar FCM estar pronto antes de continuar
+        await Future.delayed(const Duration(milliseconds: 200));
       } else {
         debugPrint('[FCM] Web detectada, usando service worker');
         // Na web, o Firebase Messaging é gerenciado pelo service worker
