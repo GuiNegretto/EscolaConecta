@@ -219,6 +219,22 @@ class NotificationService {
 
   // Chama isso após o login para garantir que o token está atualizado
   Future<void> onUserLoggedIn() async {
+    // Aguardar o FCM estar inicializado antes de tentar obter o token
+    int attempts = 0;
+    const maxAttempts = 10;
+    const delayMs = 500;
+    
+    while (!_isInitialized && attempts < maxAttempts) {
+      debugPrint('[FCM] Aguardando inicialização... (tentativa ${attempts + 1}/$maxAttempts)');
+      await Future.delayed(const Duration(milliseconds: delayMs));
+      attempts++;
+    }
+    
+    if (!_isInitialized) {
+      debugPrint('[FCM] onUserLoggedIn: FCM não inicializado após ${maxAttempts * delayMs}ms');
+      return;
+    }
+    
     final token = await getToken();
     if (token != null) await _sendTokenToServer(token);
   }

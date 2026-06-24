@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/models.dart';
@@ -22,42 +23,80 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen>
-  with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+    with SingleTickerProviderStateMixin, 
+         AutomaticKeepAliveClientMixin,
+         WidgetsBindingObserver {
   final _api = ApiService();
   late ScrollController _scrollController;
   List<Message> _allMessages = [];
   bool _loading = true;
+  bool _isRefreshing = false;
+  bool _isVisible = true;
   String _selectedFilter = 'Todas';
   late TabController _tabController;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController();
+    WidgetsBinding.instance.addObserver(this);
+    _scrollController = ScrollController(keepScrollOffset: true);
     _tabController = TabController(length: 2, vsync: this);
     _load();
-    // Atualizar a cada 30 segundos
-    Future.delayed(Duration.zero, _setupAutoRefresh);
+    _startAutoRefresh();
   }
 
-  void _setupAutoRefresh() {
-    Future.delayed(const Duration(seconds: 30), () {
-      if (mounted) {
-        _load();
-        _setupAutoRefresh();
-      }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    setState(() {
+      _isVisible = state == AppLifecycleState.resumed;
     });
+    
+    if (_isVisible) {
+      _startAutoRefresh();
+      _load(silent: true); // Atualizar dados ao voltar para a tela
+    } else {
+      _stopAutoRefresh();
+    }
+  }
+
+  void _startAutoRefresh() {
+    _stopAutoRefresh();
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) {
+        if (_isVisible && mounted) {
+          _load(silent: true);
+        }
+      },
+    );
+  }
+
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
   }
 
   @override
   void dispose() {
+    _stopAutoRefresh();
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool silent = false}) async {
+    // Evitar múltiplas requisições simultâneas
+    if (_isRefreshing) return;
+    
+    if (!silent) {
+      setState(() => _loading = true);
+    } else {
+      _isRefreshing = true;
+    }
+    
     try {
       // Carregar mensagens enviadas e rascunhos em paralelo
       final results = await Future.wait([
@@ -65,17 +104,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         _api.getAdminMessages(isDraft: true),
       ]);
       
-      setState(() {
-        _allMessages = [...results[0], ...results[1]];
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() => _loading = false);
       if (mounted) {
-        AppErrorDialog.show(
-          context,
-          message: 'Erro ao carregar: $e',
-        );
+        setState(() {
+          _allMessages = [...results[0], ...results[1]];
+          _loading = false;
+          _isRefreshing = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _isRefreshing = false;
+        });
+        // Só mostrar erro se não for refresh silencioso
+        if (!silent) {
+          AppErrorDialog.show(
+            context,
+            message: 'Erro ao carregar: $e',
+          );
+        }
       }
     }
   }
@@ -170,32 +218,48 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       ),
       drawer: _buildDrawer(context, user),
       body: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => _load(silent: false),
         color: AppTheme.accentBlue,
         child: _loading
             ? const Center(
                 child: AppLoadingIndicator(size: 48, color: AppTheme.accentBlue),
               )
-            : SingleChildScrollView(
-              key: const PageStorageKey('admin_dashboard_scroll'),
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ─── AÇÕES RÁPIDAS ──────────────────────────────────────
-                    _buildQuickActionsSection(context),
-                    const SizedBox(height: 20),
+            : Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      key: const PageStorageKey('admin_dashboard_scroll'),
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ─── AÇÕES RÁPIDAS ──────────────────────────────────────
+                          _buildQuickActionsSection(context),
+                          const SizedBox(height: 20),
 
-                    // ─── RESUMO (Summary Cards) ──────────────────────────────
-                    _buildSummarySection(context, stats),
-                    const SizedBox(height: 20),
+                          // ─── RESUMO (Summary Cards) ──────────────────────────────
+                          _buildSummarySection(context, stats),
+                          const SizedBox(height: 20),
 
-                    // ─── CENTRAL DE COMUNICADOS ──────────────────────────────
-                    _buildCommunicationCenter(context, filteredMessages),
-                  ],
-                ),
+                          // ─── CENTRAL DE COMUNICADOS ──────────────────────────────
+                          _buildCommunicationCenter(context, filteredMessages),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Indicador discreto de refresh em background
+                  if (_isRefreshing)
+                    Container(
+                      height: 2,
+                      color: AppTheme.accentBlue.withOpacity(0.5),
+                      child: const LinearProgressIndicator(
+                        backgroundColor: Colors.transparent,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentBlue),
+                      ),
+                    ),
+                ],
               ),
       ),
     );
@@ -391,67 +455,84 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         ),
         const SizedBox(height: 12),
 
+        // Lista de mensagens com altura calculada dinamicamente
         SizedBox(
-          height: 400,
+          height: MediaQuery.of(context).size.height * 0.5, // 50% da altura da tela
           child: TabBarView(
             controller: _tabController,
             children: [
               // Rascunhos
-              drafts.isEmpty
-                  ? CommunicationEmptyState(
-                      title: 'Nenhum rascunho',
-                      subtitle: 'Crie um rascunho para salvar seu progresso',
-                      icon: Icons.edit,
-                      onAction: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AdminSendMessageScreen()),
-                      ).then((_) => _load()),
-                      actionLabel: 'Criar Rascunho',
-                    )
-                  : ListView.builder(
-                      itemCount: drafts.length,
-                      itemBuilder: (_, i) => AdminMessageListCard(
-                        key: ValueKey(drafts[i].id),
-                        message: drafts[i],
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AdminMessageDetailScreen(messageId: drafts[i].id),
-                          ),
-                        ).then((_) => _load()),
-                        onEdit: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => AdminSendMessageScreen(messageId: drafts[i].id)),
-                        ).then((_) => _load()),
-                      ),
-                    ),
+              _buildMessageList(
+                context,
+                drafts,
+                emptyTitle: 'Nenhum rascunho',
+                emptySubtitle: 'Crie um rascunho para salvar seu progresso',
+                emptyIcon: Icons.edit,
+                showEmptyAction: true,
+              ),
 
               // Enviadas
-              sent.isEmpty
-                  ? CommunicationEmptyState(
-                      title: 'Nenhuma mensagem enviada',
-                      subtitle: 'Mensagens enviadas aparecerão aqui',
-                      icon: Icons.send,
-                      onAction: () {},
-                      actionLabel: '—',
-                    )
-                  : ListView.builder(
-                      itemCount: sent.length,
-                      itemBuilder: (_, i) => AdminMessageListCard(
-                        key: ValueKey(sent[i].id),
-                        message: sent[i],
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AdminMessageDetailScreen(messageId: sent[i].id),
-                          ),
-                        ).then((_) => _load()),
-                      ),
-                    ),
+              _buildMessageList(
+                context,
+                sent,
+                emptyTitle: 'Nenhuma mensagem enviada',
+                emptySubtitle: 'Mensagens enviadas aparecerão aqui',
+                emptyIcon: Icons.send,
+                showEmptyAction: false,
+              ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMessageList(
+    BuildContext context,
+    List<Message> messages, {
+    required String emptyTitle,
+    required String emptySubtitle,
+    required IconData emptyIcon,
+    required bool showEmptyAction,
+  }) {
+    if (messages.isEmpty) {
+      return CommunicationEmptyState(
+        title: emptyTitle,
+        subtitle: emptySubtitle,
+        icon: emptyIcon,
+        onAction: showEmptyAction
+            ? () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const AdminSendMessageScreen()),
+                ).then((_) => _load())
+            : null,
+        actionLabel: showEmptyAction ? 'Criar Rascunho' : null,
+      );
+    }
+
+    return ListView.builder(
+      key: PageStorageKey('message_list_${messages.first.status}'),
+      padding: const EdgeInsets.only(bottom: 16),
+      itemCount: messages.length,
+      itemBuilder: (_, i) => AdminMessageListCard(
+        key: ValueKey(messages[i].id),
+        message: messages[i],
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AdminMessageDetailScreen(messageId: messages[i].id),
+          ),
+        ).then((_) => _load()),
+        onEdit: messages[i].status == MessageStatus.draft
+            ? () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          AdminSendMessageScreen(messageId: messages[i].id)),
+                ).then((_) => _load())
+            : null,
+      ),
     );
   }
 

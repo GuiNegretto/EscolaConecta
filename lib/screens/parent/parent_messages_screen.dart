@@ -250,6 +250,7 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen>
             ),
           ),
           ListTile(
+            tileColor: Colors.transparent,
             leading: Icon(Icons.inbox_outlined,
                 color: Theme.of(context).colorScheme.primary),
             title: Text('Mensagens',
@@ -257,6 +258,7 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen>
             onTap: () => Navigator.pop(context),
           ),
           ListTile(
+            tileColor: Colors.transparent,
             leading: Icon(Icons.notifications_outlined,
                 color: Theme.of(context).colorScheme.primary),
             title: Text('Notificações',
@@ -271,6 +273,7 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen>
             },
           ),
           ListTile(
+            tileColor: Colors.transparent,
             leading: Icon(Icons.person_outline,
                 color: Theme.of(context).colorScheme.primary),
             title: Text('Meu Perfil',
@@ -286,6 +289,7 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen>
           const Spacer(),
           Divider(color: Theme.of(context).dividerColor),
           ListTile(
+            tileColor: Colors.transparent,
             leading: const Icon(Icons.logout, color: AppTheme.danger),
             title: const Text('Sair',
                 style: TextStyle(color: AppTheme.danger)),

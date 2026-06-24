@@ -196,6 +196,7 @@ class _FileAttachment extends StatelessWidget {
           ),
         ),
         child: ListTile(
+          tileColor: Colors.transparent,
           leading: const Icon(Icons.attach_file, color: AppTheme.accentBlue),
           title: Text(
             attachment.fileName,
