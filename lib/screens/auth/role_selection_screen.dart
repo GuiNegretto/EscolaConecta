@@ -35,7 +35,7 @@ class RoleSelectionScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   _RoleButton(
                     icon: Icons.family_restroom_outlined,
-                    title: 'Pais/Responsáveis',
+                    title: 'Responsáveis',
                     subtitle: 'Família',
                     onTap: () => _navigate(context, UserRole.parent),
                   ),

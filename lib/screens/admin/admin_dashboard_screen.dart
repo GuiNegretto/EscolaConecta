@@ -365,7 +365,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             ),
             QuickAccessButton(
               icon: Icons.person_add_outlined,
-              label: 'Cadastrar Pai',
+              label: 'Cadastrar Responsável',
               color: AppTheme.accentBlue,
               onTap: () => Navigator.push(
                 context,

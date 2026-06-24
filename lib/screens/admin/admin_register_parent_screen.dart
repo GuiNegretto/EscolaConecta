@@ -316,7 +316,7 @@ class _AdminRegisterParentScreenState extends State<AdminRegisterParentScreen> {
       backgroundColor: AppTheme.darkBg,
       appBar: AppBar(
         backgroundColor: AppTheme.primaryBlue,
-        title: const Text('Guardiões'),
+        title: const Text('Responsáveis'),
         leading: const BackButton(color: Colors.white),
         actions: [
           IconButton(

@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../services/logging_http_client.dart';
 import '../utils/constants.dart';
+import '../firebase_options.dart';
 
 // ─── Handler de background (top-level obrigatório) ────────────────────────────
 @pragma('vm:entry-point')
@@ -57,6 +58,33 @@ class NotificationService {
     debugPrint('[FCM] ===== INICIANDO INICIALIZAÇÃO =====');
     
     try {
+      // Verificar se Firebase Core está inicializado antes de continuar
+      bool firebaseCoreReady = false;
+      try {
+        Firebase.app(); // Tenta acessar o app padrão
+        firebaseCoreReady = true;
+        debugPrint('[FCM] ✅ Firebase Core já está inicializado');
+      } catch (e) {
+        debugPrint('[FCM] ⚠️ Firebase Core não encontrado: $e');
+        debugPrint('[FCM] Tentando inicializar Firebase Core...');
+        try {
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+          firebaseCoreReady = true;
+          debugPrint('[FCM] ✅ Firebase Core inicializado com sucesso');
+        } catch (initError) {
+          debugPrint('[FCM] ❌ Erro ao inicializar Firebase Core: $initError');
+          firebaseCoreReady = false;
+        }
+      }
+      
+      if (!firebaseCoreReady) {
+        debugPrint('[FCM] ❌ Impossível continuar sem Firebase Core');
+        _isInitialized = true; // Marcar como inicializado para não travar
+        return;
+      }
+      
       // Inicializar Firebase Messaging APENAS se Firebase Core estiver pronto
       // e NÃO estiver na web (web usa service worker)
       if (!kIsWeb) {
