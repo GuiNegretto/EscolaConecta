@@ -84,6 +84,39 @@ class User {
 enum MessageType { geral, turma, individual }
 enum MessageStatus { draft, scheduled, pending, sending, sent, cancelled, failed }
 
+class MessageAttachment {
+  final String id;
+  final String fileName;
+  final String fileType;
+  final String url;
+
+  const MessageAttachment({
+    required this.id,
+    required this.fileName,
+    required this.fileType,
+    required this.url,
+  });
+
+  factory MessageAttachment.fromJson(Map<String, dynamic> json) {
+    return MessageAttachment(
+      id: json['id']?.toString() ?? '',
+      fileName: json['file_name'] ?? json['fileName'] ?? '',
+      fileType: json['file_type'] ?? json['fileType'] ?? '',
+      url: json['url'] ?? json['file_path'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'file_name': fileName,
+        'file_type': fileType,
+        'url': url,
+      };
+
+  bool get isImage => fileType.startsWith('image/');
+  bool get isVideo => fileType.startsWith('video/');
+}
+
 class Message {
   final String id;
   final String title;
@@ -100,6 +133,7 @@ class Message {
   final int? recipientCount;
   final int? successCount;
   final int? failureCount;
+  final List<MessageAttachment> attachments;
 
   const Message({
     required this.id,
@@ -117,12 +151,26 @@ class Message {
     this.recipientCount,
     this.successCount,
     this.failureCount,
+    this.attachments = const [],
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
     final rawCreatedAt = json['created_at'] ?? json['sentAt'] ?? json['createdAt'];
     final rawScheduledAt = json['scheduled_at'] ?? json['scheduledAt'];
     final rawSentAt = json['sent_at'] ?? json['sentAt'];
+
+    // Parse attachments
+    final List<MessageAttachment> attachmentsList = [];
+    if (json['attachments'] != null) {
+      final attachmentsJson = json['attachments'] as List<dynamic>?;
+      if (attachmentsJson != null) {
+        for (var att in attachmentsJson) {
+          if (att is Map<String, dynamic>) {
+            attachmentsList.add(MessageAttachment.fromJson(att));
+          }
+        }
+      }
+    }
 
     return Message(
       id: json['id']?.toString() ?? '',
@@ -140,6 +188,7 @@ class Message {
       recipientCount: json['recipient_count'] as int?,
       successCount: json['success_count'] as int?,
       failureCount: json['failure_count'] as int?,
+      attachments: attachmentsList,
     );
   }
 

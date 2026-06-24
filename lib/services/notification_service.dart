@@ -32,9 +32,10 @@ class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
 
-  final _fcm = FirebaseMessaging.instance;
+  FirebaseMessaging? _fcm;
   final _localNotif = FlutterLocalNotificationsPlugin();
   final http.Client _client = LoggingHttpClient();
+  bool _isInitialized = false;
 
   // Chave para contagem de notificações não lidas (badge)
   static const _badgeKey = 'notif_badge_count';
@@ -48,46 +49,81 @@ class NotificationService {
   // ── Inicialização ────────────────────────────────────────────────────────
 
   Future<void> initialize() async {
-    // 1. Permissões (Android 13+ e iOS)
-    await _requestPermission();
+    if (_isInitialized) {
+      debugPrint('[FCM] Já inicializado, ignorando...');
+      return;
+    }
 
-    // 2. Criar canal Android
-    await _localNotif
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(_channel);
+    try {
+      // Inicializar Firebase Messaging APENAS se Firebase Core estiver pronto
+      // e NÃO estiver na web (web usa service worker)
+      if (!kIsWeb) {
+        _fcm = FirebaseMessaging.instance;
+        debugPrint('[FCM] FirebaseMessaging.instance criado');
+      } else {
+        debugPrint('[FCM] Web detectada, usando service worker');
+        // Na web, o Firebase Messaging é gerenciado pelo service worker
+        // Não inicializamos _fcm aqui
+      }
 
-    // 3. Configurar flutter_local_notifications
-    const androidInit =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidInit);
-    await _localNotif.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: _onLocalNotifTap,
-    );
+      // 1. Permissões (Android 13+ e iOS) - só se não for web
+      if (!kIsWeb && _fcm != null) {
+        await _requestPermission();
+      }
 
-    // 4. Foreground: FCM não exibe banner sozinho — fazemos via local notif
-    FirebaseMessaging.onMessage.listen(_handleForeground);
+      // 2. Criar canal Android - só se for Android
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        await _localNotif
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.createNotificationChannel(_channel);
+      }
 
-    // 5. Background tap — app estava em background e usuário tocou
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
+      // 3. Configurar flutter_local_notifications - só se não for web
+      if (!kIsWeb) {
+        const androidInit =
+            AndroidInitializationSettings('@mipmap/ic_launcher');
+        const initSettings = InitializationSettings(android: androidInit);
+        await _localNotif.initialize(
+          initSettings,
+          onDidReceiveNotificationResponse: _onLocalNotifTap,
+        );
+      }
 
-    // 6. App aberto a partir de notificação (estava morto)
-    final initial = await _fcm.getInitialMessage();
-    if (initial != null) _handleTap(initial);
+      // 4. Foreground: FCM não exibe banner sozinho — fazemos via local notif
+      if (!kIsWeb) {
+        FirebaseMessaging.onMessage.listen(_handleForeground);
 
-    // 7. Registrar token no servidor sempre que renovar
-    _fcm.onTokenRefresh.listen(_sendTokenToServer);
+        // 5. Background tap — app estava em background e usuário tocou
+        FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
 
-    // 8. Enviar token atual na inicialização
-    final token = await getToken();
-    if (token != null) await _sendTokenToServer(token);
+        // 6. App aberto a partir de notificação (estava morto)
+        if (_fcm != null) {
+          final initial = await _fcm!.getInitialMessage();
+          if (initial != null) _handleTap(initial);
+
+          // 7. Registrar token no servidor sempre que renovar
+          _fcm!.onTokenRefresh.listen(_sendTokenToServer);
+        }
+      }
+
+      // 8. Enviar token atual na inicialização
+      final token = await getToken();
+      if (token != null) await _sendTokenToServer(token);
+
+      _isInitialized = true;
+      debugPrint('[FCM] Inicialização concluída com sucesso');
+    } catch (e) {
+      debugPrint('[FCM] Erro na inicialização: $e');
+      // Não throw - permite que o app continue funcionando
+    }
   }
 
   // ── Permissão ────────────────────────────────────────────────────────────
 
   Future<void> _requestPermission() async {
-    final settings = await _fcm.requestPermission(
+    if (_fcm == null) return;
+    final settings = await _fcm!.requestPermission(
       alert: true,
       badge: true,
       sound: true,
@@ -100,8 +136,12 @@ class NotificationService {
   // ── Token FCM ────────────────────────────────────────────────────────────
 
   Future<String?> getToken() async {
+    if (_fcm == null) {
+      debugPrint('[FCM] getToken: FCM não inicializado');
+      return null;
+    }
     try {
-      return await _fcm.getToken();
+      return await _fcm!.getToken();
     } catch (e) {
       debugPrint('[FCM] getToken error: $e');
       return null;
@@ -284,18 +324,24 @@ class NotificationService {
   // Permite que o servidor envie para grupos sem precisar de token individual
 
   Future<void> subscribeToClass(String className) async {
+    if (_fcm == null) {
+      debugPrint('[FCM] subscribeToClass: FCM não inicializado');
+      return;
+    }
     // Ex: "turma_1ano_a"
     final topic = _topicName(className);
-    await _fcm.subscribeToTopic(topic);
+    await _fcm!.subscribeToTopic(topic);
     debugPrint('[FCM] Subscribed: $topic');
   }
 
   Future<void> unsubscribeFromClass(String className) async {
-    await _fcm.unsubscribeFromTopic(_topicName(className));
+    if (_fcm == null) return;
+    await _fcm!.unsubscribeFromTopic(_topicName(className));
   }
 
   Future<void> subscribeToGlobal() async {
-    await _fcm.subscribeToTopic('escola_geral');
+    if (_fcm == null) return;
+    await _fcm!.subscribeToTopic('escola_geral');
   }
 
   String _topicName(String cls) =>

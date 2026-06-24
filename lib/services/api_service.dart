@@ -251,6 +251,10 @@ class ApiService {
     return Message.fromJson(data);
   }
 
+  Future<void> markMessageAsRead(String messageId) async {
+    await _put('${AppConstants.messagesEndpoint}/$messageId/read', {});
+  }
+
   Future<void> sendMessage(SendMessageRequest req, {List<String>? filePaths}) async {
     await _ensureTokenLoaded();
     final uri = Uri.parse('${AppConstants.baseUrl}${AppConstants.sendMessageEndpoint}');

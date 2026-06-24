@@ -3,10 +3,17 @@ import 'package:intl/intl.dart';
 import '../../models/models.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
+import '../../widgets/message_attachments_widget.dart';
 
 class ParentMessageDetailScreen extends StatefulWidget {
   final Message message;
-  const ParentMessageDetailScreen({super.key, required this.message});
+  final VoidCallback? onRead;
+  
+  const ParentMessageDetailScreen({
+    super.key,
+    required this.message,
+    this.onRead,
+  });
 
   @override
   State<ParentMessageDetailScreen> createState() =>
@@ -15,10 +22,24 @@ class ParentMessageDetailScreen extends StatefulWidget {
 
 class _ParentMessageDetailScreenState
     extends State<ParentMessageDetailScreen> {
+  final _api = ApiService();
+  
   @override
   void initState() {
     super.initState();
-    // Message is marked as read automatically by backend on GET
+    _markAsRead();
+  }
+  
+  Future<void> _markAsRead() async {
+    if (!widget.message.isNew) return;
+    
+    try {
+      await _api.markMessageAsRead(widget.message.id);
+      // Notificar a tela pai para atualizar o contador
+      widget.onRead?.call();
+    } catch (e) {
+      debugPrint('Erro ao marcar mensagem como lida: $e');
+    }
   }
 
   @override
@@ -91,6 +112,10 @@ class _ParentMessageDetailScreenState
                 fontSize: 15,
                 height: 1.7,
               ),
+            ),
+            // Attachments
+            MessageAttachmentsWidget(
+              attachments: m.attachments,
             ),
           ],
         ),

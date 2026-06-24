@@ -73,6 +73,12 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen>
         automaticallyImplyLeading: false,
         title: const Text('Mensagens'),
         actions: [
+          // Botão de refresh
+          IconButton(
+            icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onPrimary),
+            onPressed: _load,
+            tooltip: 'Atualizar mensagens',
+          ),
           Consumer<ThemeProvider>(
             builder: (ctx, themeProvider, _) => IconButton(
               icon: Icon(
@@ -179,14 +185,27 @@ class _ParentMessagesScreenState extends State<ParentMessagesScreen>
                           itemBuilder: (_, i) => MessageCard(
                             key: ValueKey(_filtered[i].id),
                             message: _filtered[i],
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ParentMessageDetailScreen(
-                                  message: _filtered[i],
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ParentMessageDetailScreen(
+                                    message: _filtered[i],
+                                    onRead: () {
+                                      // Atualizar contador localmente
+                                      setState(() {
+                                        // Marcar mensagem como lida localmente
+                                        final index = _messages.indexWhere((m) => m.id == _filtered[i].id);
+                                        if (index != -1) {
+                                          // Como Message é imutável, vamos apenas recarregar
+                                          _load();
+                                        }
+                                      });
+                                    },
+                                  ),
                                 ),
-                              ),
-                            ),
+                              );
+                            },
                           ),
                         ),
                       ),
