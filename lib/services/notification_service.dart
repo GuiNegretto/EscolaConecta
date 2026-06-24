@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../services/logging_http_client.dart';
 import '../utils/constants.dart';
-import '../firebase_options.dart';
 
 // ─── Handler de background (top-level obrigatório) ────────────────────────────
 @pragma('vm:entry-point')
@@ -49,34 +48,26 @@ class NotificationService {
 
   // ── Inicialização ────────────────────────────────────────────────────────
 
-  Future<void> initialize() async {
-    if (_isInitialized) {
+  Future<void> initialize({bool isRetry = false}) async {
+    if (_isInitialized && !isRetry) {
       debugPrint('[FCM] Já inicializado, ignorando...');
       return;
     }
 
-    debugPrint('[FCM] ===== INICIANDO INICIALIZAÇÃO =====');
+    debugPrint('[FCM] ===== INICIANDO INICIALIZAÇÃO${isRetry ? " (RETRY)" : ""} =====');
     
     try {
       // Verificar se Firebase Core está inicializado antes de continuar
+      // NUNCA tenta inicializar Firebase Core aqui - isso deve ser feito no main.dart
       bool firebaseCoreReady = false;
       try {
         Firebase.app(); // Tenta acessar o app padrão
         firebaseCoreReady = true;
         debugPrint('[FCM] ✅ Firebase Core já está inicializado');
       } catch (e) {
-        debugPrint('[FCM] ⚠️ Firebase Core não encontrado: $e');
-        debugPrint('[FCM] Tentando inicializar Firebase Core...');
-        try {
-          await Firebase.initializeApp(
-            options: DefaultFirebaseOptions.currentPlatform,
-          );
-          firebaseCoreReady = true;
-          debugPrint('[FCM] ✅ Firebase Core inicializado com sucesso');
-        } catch (initError) {
-          debugPrint('[FCM] ❌ Erro ao inicializar Firebase Core: $initError');
-          firebaseCoreReady = false;
-        }
+        debugPrint('[FCM] ❌ Firebase Core não está inicializado: $e');
+        debugPrint('[FCM] ❌ Firebase Core deve ser inicializado no main.dart');
+        firebaseCoreReady = false;
       }
       
       if (!firebaseCoreReady) {
@@ -288,23 +279,32 @@ class NotificationService {
     
     if (!_isInitialized) {
       debugPrint('[Auth] ⚠️ FCM não inicializado após ${maxAttempts * delayMs}ms');
-      debugPrint('[Auth] Tentando inicializar novamente (lazy initialization)...');
+      debugPrint('[Auth] ❌ FCM falhou na inicialização do app, pulando registro de token');
+      return;
+    }
+    
+    // Se está marcado como inicializado mas _fcm é null, houve erro na inicialização
+    if (_fcm == null) {
+      debugPrint('[Auth] ⚠️ FCM marcado como inicializado mas instância é null');
+      debugPrint('[Auth] Tentando criar instância do FCM novamente...');
       
-      // Tentar inicializar novamente
       try {
-        await initialize();
+        // Verificar se Firebase Core está disponível
+        Firebase.app();
+        
+        // Tentar criar a instância do FCM novamente
+        _fcm = FirebaseMessaging.instance;
+        debugPrint('[Auth] ✅ Instância do FCM criada com sucesso');
+        
+        // Tentar obter token
+        await Future.delayed(const Duration(milliseconds: 500));
       } catch (e) {
-        debugPrint('[Auth] Erro ao tentar reinicializar: $e');
-      }
-      
-      // Verificar se agora está inicializado
-      if (!_isInitialized) {
-        debugPrint('[Auth] ❌ FCM ainda não está pronto, pulando registro de token');
+        debugPrint('[Auth] ❌ Erro ao criar instância do FCM: $e');
         return;
       }
     }
     
-    debugPrint('[Auth] ✅ FCM inicializado, obtendo token...');
+    debugPrint('[Auth] ✅ FCM pronto, obtendo token...');
     final token = await getToken();
     if (token != null) {
       debugPrint('[Auth] ✅ Token obtido, enviando ao servidor...');
