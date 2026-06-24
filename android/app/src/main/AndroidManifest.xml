@@ -42,15 +42,9 @@
                 android:resource="@xml/file_provider_paths" />
         </provider>
 
-        <!-- Firebase Cloud Messaging Service -->
-        <service
-            android:name="com.google.firebase.messaging.FirebaseMessagingService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
-            </intent-filter>
-        </service>
-
+        <!-- Firebase Cloud Messaging - O serviço é registrado automaticamente pelo plugin -->
+        <!-- Configurações do FCM -->
+        
         <!-- Canal de notificação padrão do FCM -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"

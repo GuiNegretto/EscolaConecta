@@ -24,10 +24,13 @@ android {
 
     defaultConfig {
         applicationId = "com.example.escolaconecta"
-        minSdk = flutter.minSdkVersion
+        // Firebase requer minSdk 21+, recomendado 23+ para melhor compatibilidade
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // MultiDex necessário para Firebase e outras dependências
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -43,4 +46,6 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    // MultiDex para suportar Firebase e múltiplas dependências
+    implementation("androidx.multidex:multidex:2.0.1")
 }
