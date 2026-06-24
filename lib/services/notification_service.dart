@@ -123,7 +123,7 @@ class NotificationService {
             AndroidInitializationSettings('@mipmap/ic_launcher');
         const initSettings = InitializationSettings(android: androidInit);
         await _localNotif.initialize(
-          initSettings,
+          settings: initSettings,
           onDidReceiveNotificationResponse: _onLocalNotifTap,
         );
         debugPrint('[FCM] ✅ flutter_local_notifications inicializado');
@@ -376,10 +376,10 @@ class NotificationService {
     );
 
     await _localNotif.show(
-      message.hashCode,
-      notif.title,
-      notif.body,
-      NotificationDetails(android: androidDetails),
+      id: message.hashCode,
+      title: notif.title,
+      body: notif.body,
+      notificationDetails: NotificationDetails(android: androidDetails),
       payload: jsonEncode(message.data),
     );
   }
@@ -399,10 +399,10 @@ class NotificationService {
       color: const Color(0xFF1A3DB5),
     );
     await _localNotif.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      NotificationDetails(android: androidDetails),
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(android: androidDetails),
       payload: jsonEncode({'type': type}),
     );
   }
