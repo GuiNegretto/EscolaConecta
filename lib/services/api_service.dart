@@ -9,6 +9,14 @@ import '../utils/constants.dart';
 import '../utils/api_routes.dart';
 import '../services/auth_provider.dart';
 
+/// Helper class for file uploads from bytes (Web compatibility)
+class FileUpload {
+  final Uint8List bytes;
+  final String name;
+
+  const FileUpload({required this.bytes, required this.name});
+}
+
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
@@ -288,7 +296,11 @@ class ApiService {
     await _handleResponse(res);
   }
 
-  Future<Message> createMessage(SendMessageRequest req, {List<String>? filePaths}) async {
+  Future<Message> createMessage(
+    SendMessageRequest req, {
+    List<String>? filePaths,
+    List<FileUpload>? fileBytes,
+  }) async {
     await _ensureTokenLoaded();
     final uri = Uri.parse('${AppConstants.baseUrl}${AppConstants.adminMessagesEndpoint}');
     final reqMultipart = http.MultipartRequest('POST', uri)
@@ -323,10 +335,21 @@ class ApiService {
       reqMultipart.fields['scheduled_at'] = req.scheduledAt!.toUtc().toIso8601String();
     }
 
-    // Add files if provided
+    // Add files from paths (mobile/desktop)
     if (filePaths != null && filePaths.isNotEmpty) {
       for (final path in filePaths) {
         reqMultipart.files.add(await http.MultipartFile.fromPath('files[]', path));
+      }
+    }
+
+    // Add files from bytes (web)
+    if (fileBytes != null && fileBytes.isNotEmpty) {
+      for (final file in fileBytes) {
+        reqMultipart.files.add(http.MultipartFile.fromBytes(
+          'files[]',
+          file.bytes,
+          filename: file.name,
+        ));
       }
     }
 
@@ -336,7 +359,12 @@ class ApiService {
     return Message.fromJson(data as Map<String, dynamic>);
   }
 
-  Future<Message> updateMessage(String id, SendMessageRequest req, {List<String>? filePaths}) async {
+  Future<Message> updateMessage(
+    String id,
+    SendMessageRequest req, {
+    List<String>? filePaths,
+    List<FileUpload>? fileBytes,
+  }) async {
     await _ensureTokenLoaded();
     final path = '${AppConstants.adminMessagesEndpoint}/$id';
     
@@ -374,10 +402,21 @@ class ApiService {
       reqMultipart.fields['scheduled_at'] = req.scheduledAt!.toUtc().toIso8601String();
     }
 
-    // Add files if provided
+    // Add files from paths (mobile/desktop)
     if (filePaths != null && filePaths.isNotEmpty) {
       for (final path in filePaths) {
         reqMultipart.files.add(await http.MultipartFile.fromPath('files[]', path));
+      }
+    }
+
+    // Add files from bytes (web)
+    if (fileBytes != null && fileBytes.isNotEmpty) {
+      for (final file in fileBytes) {
+        reqMultipart.files.add(http.MultipartFile.fromBytes(
+          'files[]',
+          file.bytes,
+          filename: file.name,
+        ));
       }
     }
 
@@ -627,5 +666,12 @@ class ApiService {
       debugPrint('[API-CSV] StackTrace: $stackTrace');
       throw ApiException('Erro ao fazer upload do CSV: ${e.toString()}');
     }
+  }
+
+  /// Reset de dados do sistema
+  /// Remove todos os alunos e vínculos, preservando senhas e tokens
+  Future<Map<String, dynamic>> resetData() async {
+    final data = await _post('/admin/reset-data', {});
+    return data as Map<String, dynamic>;
   }
 }

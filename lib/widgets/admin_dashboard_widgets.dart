@@ -28,40 +28,44 @@ class SummaryCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: color.withOpacity(0.2),
             width: 1.5,
           ),
         ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(icon, color: color, size: 20),
-                const Icon(Icons.arrow_forward, size: 14, color: Colors.grey),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              count.toString(),
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 24,
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    count.toString(),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
                   ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
-                    fontSize: 12,
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
+            //Icon(Icons.arrow_forward, size: 15, color: Colors.grey.withOpacity(0.4)),
           ],
         ),
       ),
@@ -441,28 +445,28 @@ class QuickAccessButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: color.withOpacity(0.2),
               width: 1,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(height: 6),
+              Icon(icon, color: color, size: 20),
+              const SizedBox(height: 4),
               Text(
                 label,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w600,
-                      fontSize: 11,
+                      fontSize: 10,
                     ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -471,7 +475,7 @@ class QuickAccessButton extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle!,
-                  style: TextStyle(fontSize: 9, color: Colors.grey),
+                  style: TextStyle(fontSize: 8, color: Colors.grey),
                 ),
               ],
             ],

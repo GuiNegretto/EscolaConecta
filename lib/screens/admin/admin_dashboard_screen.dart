@@ -235,14 +235,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ─── AÇÕES RÁPIDAS ──────────────────────────────────────
-                          _buildQuickActionsSection(context),
+                          // ─── AÇÕES RÁPIDAS E RESUMO (lado a lado em web) ────────
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final isWeb = constraints.maxWidth > 800;
+                              if (isWeb) {
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      flex: 5,
+                                      child: _buildQuickActionsSection(context),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      flex: 3,
+                                      child: _buildSummarySection(context, stats),
+                                    ),
+                                  ],
+                                );
+                              } else {
+                                return Column(
+                                  children: [
+                                    _buildQuickActionsSection(context),
+                                    const SizedBox(height: 20),
+                                    _buildSummarySection(context, stats),
+                                  ],
+                                );
+                              }
+                            },
+                          ),
                           const SizedBox(height: 20),
 
-                          // ─── RESUMO (Summary Cards) ──────────────────────────────
-                          _buildSummarySection(context, stats),
-                          const SizedBox(height: 20),
-
+						// ─── RESUMO (Summary Cards) ──────────────────────────────
+                         // _buildSummarySection(context, stats),
+                         // const SizedBox(height: 20),
                           // ─── CENTRAL DE COMUNICADOS ──────────────────────────────
                           _buildCommunicationCenter(context, filteredMessages),
                         ],
@@ -274,25 +301,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       children: [
         Row(
           children: [
-            Icon(Icons.trending_up, color: AppTheme.accentBlue, size: 20),
+            Icon(Icons.trending_up, color: AppTheme.accentBlue, size: 18),
             const SizedBox(width: 8),
             Text(
               'Resumo de Atividades',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    fontSize: 16,
+                    fontSize: 14,
                   ),
             ),
           ],
         ),
         const SizedBox(height: 10),
         GridView.count(
-          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 5 : 2,
+          crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 1.1,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 2.4,
           children: [
             SummaryCard(
               label: 'Rascunhos',
@@ -321,12 +348,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               icon: Icons.people,
               color: AppTheme.accentBlue,
             ),
-            SummaryCard(
-              label: 'Falhas',
-              count: stats['failed'] ?? 0,
-              icon: Icons.error,
-              color: AppTheme.danger,
-            ),
           ],
         ),
       ],
@@ -341,22 +362,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           'Ações Rápidas',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                fontSize: 16,
+                fontSize: 14,
               ),
         ),
         const SizedBox(height: 10),
         GridView.count(
-          crossAxisCount: 3,
+          crossAxisCount: 5,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 1.0,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 0.75,
           children: [
             QuickAccessButton(
               icon: Icons.mail_outline,
               label: 'Nova Mensagem',
-              color: AppTheme.primaryBlue,
+              color: Colors.redAccent,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -653,6 +674,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                               builder: (_) => const AdminImportScreen()));
                     },
                   ),
+                  const SizedBox(height: 4),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.delete_sweep_outlined,
+                    label: 'Reset de Dados',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showResetDataDialog();
+                    },
+                    isDangerous: true,
+                  ),
                 ],
               ),
             ),
@@ -751,6 +783,243 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showResetDataDialog() {
+    final confirmController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppTheme.danger, size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Reset de Dados',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.8,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.danger.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.danger.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ATENÇÃO: Esta operação é IRREVERSÍVEL!',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.danger,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Esta ação irá remover PERMANENTEMENTE:',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildResetItem('✓', 'Todos os alunos cadastrados'),
+                _buildResetItem('✓', 'Todos os vínculos aluno-responsável'),
+                _buildResetItem('✓', 'Vínculos serão desassociados dos responsáveis'),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.success.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Serão PRESERVADOS:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.success,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildResetItem('✓', 'Senhas dos responsáveis', isSuccess: true),
+                      _buildResetItem('✓', 'Tokens de notificação', isSuccess: true),
+                      _buildResetItem('✓', 'Dados dos administradores', isSuccess: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Para confirmar, digite: RESETAR',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: confirmController,
+                  enabled: !isLoading,
+                  decoration: InputDecoration(
+                    hintText: 'Digite RESETAR',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+                  ),
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: isLoading || confirmController.text.trim() != 'RESETAR'
+                  ? null
+                  : () async {
+                      setDialogState(() => isLoading = true);
+                      try {
+                        final result = await _api.resetData();
+                        
+                        if (!mounted) return;
+                        Navigator.pop(ctx);
+                        
+                        // Mostrar resultado
+                        showDialog(
+                          context: context,
+                          builder: (ctx2) => AlertDialog(
+                            title: Row(
+                              children: [
+                                Icon(Icons.check_circle, color: AppTheme.success, size: 28),
+                                const SizedBox(width: 12),
+                                const Text('Reset Concluído'),
+                              ],
+                            ),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Reset executado com sucesso!',
+                                    style: TextStyle(fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 16),
+                                _buildResultItem('Alunos removidos',
+                                    '${result['students_deleted'] ?? 0}'),
+                                _buildResultItem('Vínculos removidos',
+                                    '${result['links_deleted'] ?? 0}'),
+                                _buildResultItem('Responsáveis afetados',
+                                    '${result['guardians_affected'] ?? 0}'),
+                                _buildResultItem('Tokens preservados',
+                                    '${result['tokens_preserved'] ?? 0}'),
+                                _buildResultItem('Admins preservados',
+                                    '${result['admins_preserved'] ?? 0}'),
+                              ],
+                            ),
+                            actions: [
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(ctx2);
+                                  _load(); // Recarregar dados
+                                },
+                                child: const Text('OK'),
+                              ),
+                            ],
+                          ),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        Navigator.pop(ctx);
+                        AppErrorDialog.show(
+                          context,
+                          message: 'Erro ao executar reset: $e',
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.danger,
+                foregroundColor: Colors.white,
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Confirmar Reset'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResetItem(String bullet, String text, {bool isSuccess = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            bullet,
+            style: TextStyle(
+              color: isSuccess ? AppTheme.success : AppTheme.danger,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13)),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -5,6 +5,7 @@ import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/admin_dashboard_widgets.dart';
 import '../../widgets/app_loading_error_widgets.dart';
+import '../../widgets/message_attachments_widget.dart';
 
 class AdminMessageDetailScreen extends StatefulWidget {
   final String messageId;
@@ -242,6 +243,42 @@ class _AdminMessageDetailScreenState extends State<AdminMessageDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
+
+                // ─── ANEXOS ─────────────────────────────────────────
+                if (msg.attachments.isNotEmpty)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).dividerColor,
+                        width: 1,
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.attach_file, color: AppTheme.accentBlue),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Anexos (${msg.attachments.length})',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        MessageAttachmentsWidget(attachments: msg.attachments),
+                      ],
+                    ),
+                  ),
+                if (msg.attachments.isNotEmpty)
+                  const SizedBox(height: 20),
 
                 // ─── DESTINATÁRIOS ──────────────────────────────────
                 if (msg.recipientCount != null || msg.className != null)

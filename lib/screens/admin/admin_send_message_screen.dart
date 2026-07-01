@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
 import '../../models/models.dart';
 import '../../models/mensagem_destinatario.dart';
@@ -284,17 +285,29 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         scheduledAt: _isScheduled ? _scheduledTime : null,
       );
 
-      // Converter PlatformFile para paths (apenas mobile/desktop)
-      final filePaths = _selectedFiles
-          .where((f) => f.path != null)
-          .map((f) => f.path!)
-          .toList();
+      // Detectar plataforma e usar bytes no Web, paths em mobile/desktop
+      List<String>? filePaths;
+      List<FileUpload>? fileBytes;
+      
+      if (kIsWeb) {
+        // Web: usar bytes
+        fileBytes = _selectedFiles.map((f) => FileUpload(
+          bytes: f.bytes!,
+          name: f.name,
+        )).toList();
+      } else {
+        // Mobile/Desktop: usar paths
+        filePaths = _selectedFiles
+            .where((f) => f.path != null)
+            .map((f) => f.path!)
+            .toList();
+      }
 
       final editingMessage = _editingMessage;
       if (editingMessage != null) {
-        await _api.updateMessage(editingMessage.id, req, filePaths: filePaths.isNotEmpty ? filePaths : null);
+        await _api.updateMessage(editingMessage.id, req, filePaths: filePaths);
       } else {
-        await _api.createMessage(req, filePaths: filePaths.isNotEmpty ? filePaths : null);
+        await _api.createMessage(req, filePaths: filePaths, fileBytes: fileBytes);
       }
 
       if (mounted) {
@@ -384,8 +397,6 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
           : _targetClass;
       final scheduledAt = _isScheduled ? _scheduledTime : null;
 
-
-
       final req = SendMessageRequest(
         title: title,
         content: content,
@@ -395,11 +406,29 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         scheduledAt: scheduledAt,
       );
 
+      // Detectar plataforma e usar bytes no Web, paths em mobile/desktop
+      List<String>? filePaths;
+      List<FileUpload>? fileBytes;
+      
+      if (kIsWeb) {
+        // Web: usar bytes
+        fileBytes = _selectedFiles.map((f) => FileUpload(
+          bytes: f.bytes!,
+          name: f.name,
+        )).toList();
+      } else {
+        // Mobile/Desktop: usar paths
+        filePaths = _selectedFiles
+            .where((f) => f.path != null)
+            .map((f) => f.path!)
+            .toList();
+      }
+
       final editingMessage = _editingMessage;
       if (editingMessage != null) {
-        await _api.updateMessage(editingMessage.id, req);
+        await _api.updateMessage(editingMessage.id, req, filePaths: filePaths);
       } else {
-        await _api.createMessage(req);
+        await _api.createMessage(req, filePaths: filePaths, fileBytes: fileBytes);
       }
 
       if (mounted) {
@@ -478,6 +507,24 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
 
       if (confirm != true) return;
 
+      // Detectar plataforma e usar bytes no Web, paths em mobile/desktop
+      List<String>? filePaths;
+      List<FileUpload>? fileBytes;
+      
+      if (kIsWeb) {
+        // Web: usar bytes
+        fileBytes = _selectedFiles.map((f) => FileUpload(
+          bytes: f.bytes!,
+          name: f.name,
+        )).toList();
+      } else {
+        // Mobile/Desktop: usar paths
+        filePaths = _selectedFiles
+            .where((f) => f.path != null)
+            .map((f) => f.path!)
+            .toList();
+      }
+
       // Save (create/update) first to get an ID, then call send endpoint
       final editingMessage = _editingMessage;
       Message? saved;
@@ -487,13 +534,14 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         debugPrint('[SEND_NOW] Tipo: $selectedType');
         debugPrint('[SEND_NOW] Turma: $targetClass');
         debugPrint('[SEND_NOW] Título: $title');
+        debugPrint('[SEND_NOW] Anexos: ${kIsWeb ? fileBytes?.length : filePaths?.length}');
         
         if (editingMessage != null) {
           debugPrint('[SEND_NOW] Atualizando mensagem existente ID: ${editingMessage.id}');
-          saved = await _api.updateMessage(editingMessage.id, req);
+          saved = await _api.updateMessage(editingMessage.id, req, filePaths: filePaths, fileBytes: fileBytes);
         } else {
           debugPrint('[SEND_NOW] Criando nova mensagem');
-          saved = await _api.createMessage(req);
+          saved = await _api.createMessage(req, filePaths: filePaths, fileBytes: fileBytes);
         }
         
         debugPrint('[SEND_NOW] Mensagem salva com sucesso');
@@ -573,14 +621,38 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         return;
       }
 
+      // Validate that scheduled time is in the future
+      if (scheduledAt.isBefore(DateTime.now())) {
+        _showError('A data de agendamento deve ser no futuro');
+        return;
+      }
+
       final req = SendMessageRequest(
         title: title,
         content: content,
         type: selectedType,
         targetClass: targetClass,
-        isDraft: false,
+        isDraft: true, // Mensagens agendadas devem ser salvas como rascunho
         scheduledAt: scheduledAt,
       );
+
+      // Detectar plataforma e usar bytes no Web, paths em mobile/desktop
+      List<String>? filePaths;
+      List<FileUpload>? fileBytes;
+      
+      if (kIsWeb) {
+        // Web: usar bytes
+        fileBytes = _selectedFiles.map((f) => FileUpload(
+          bytes: f.bytes!,
+          name: f.name,
+        )).toList();
+      } else {
+        // Mobile/Desktop: usar paths
+        filePaths = _selectedFiles
+            .where((f) => f.path != null)
+            .map((f) => f.path!)
+            .toList();
+      }
 
       // Create or update with schedule (server will handle scheduling)
       final editingMessage = _editingMessage;
@@ -591,13 +663,14 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         debugPrint('[SCHEDULE] Tipo: $selectedType');
         debugPrint('[SCHEDULE] Turma: $targetClass');
         debugPrint('[SCHEDULE] Data agendada: $scheduledAt');
+        debugPrint('[SCHEDULE] Anexos: ${kIsWeb ? fileBytes?.length : filePaths?.length}');
         
         if (editingMessage != null) {
           debugPrint('[SCHEDULE] Atualizando mensagem existente ID: ${editingMessage.id}');
-          result = await _api.updateMessage(editingMessage.id, req);
+          result = await _api.updateMessage(editingMessage.id, req, filePaths: filePaths, fileBytes: fileBytes);
         } else {
           debugPrint('[SCHEDULE] Criando nova mensagem agendada');
-          result = await _api.createMessage(req);
+          result = await _api.createMessage(req, filePaths: filePaths, fileBytes: fileBytes);
         }
         
         debugPrint('[SCHEDULE] Mensagem agendada com sucesso');
