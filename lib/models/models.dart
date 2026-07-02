@@ -257,7 +257,7 @@ class Message {
   }
 
   bool get canEdit => status == MessageStatus.draft || status == MessageStatus.scheduled;
-  bool get canSend => (status == MessageStatus.draft || status == MessageStatus.scheduled) && status != MessageStatus.sent && sentAt == null;
+  bool get canSend => (status == MessageStatus.draft || status == MessageStatus.scheduled) && sentAt == null;
   bool get canCancel => status == MessageStatus.scheduled || status == MessageStatus.pending;
   bool get canDuplicate => status == MessageStatus.sent || status == MessageStatus.draft;
 }

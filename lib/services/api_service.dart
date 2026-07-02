@@ -432,6 +432,12 @@ class ApiService {
     await _put(path, {});
   }
 
+  Future<void> deleteMessage(String id) async {
+    await _ensureTokenLoaded();
+    final path = '${AppConstants.adminMessagesEndpoint}/$id';
+    await _delete(path);
+  }
+
   // ── Students ──────────────────────────────────────────────────────────────
 
   Future<List<Student>> getStudents({String? grade, String? className}) async {
