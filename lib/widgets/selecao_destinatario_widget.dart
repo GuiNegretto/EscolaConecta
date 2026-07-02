@@ -63,7 +63,6 @@ class _SelecaoDestinatarioWidgetState extends State<SelecaoDestinatarioWidget> {
       turmaIds: [],
       alunoIds: [],
       responsavelIds: [],
-      notificarResponsaveis: false,
     ));
 
     // Move foco para campo de busca se Individual for selecionado
@@ -249,25 +248,37 @@ class _SelecaoDestinatarioWidgetState extends State<SelecaoDestinatarioWidget> {
             }).toList(),
           ),
           
+          // Nota informativa sobre notificação aos responsáveis
           if (widget.destinatario.turmaIds.isNotEmpty) ...[
             const SizedBox(height: 16),
-            CheckboxListTile(
-              value: widget.destinatario.notificarResponsaveis,
-              onChanged: (value) {
-                widget.onChanged(widget.destinatario.copyWith(
-                  notificarResponsaveis: value ?? false,
-                ));
-              },
-              title: Text(
-                'Notificar também os responsáveis dos alunos das turmas selecionadas',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: colorScheme.primaryContainer.withOpacity(0.3),
                 ),
               ),
-              activeColor: colorScheme.primary,
-              checkColor: colorScheme.onPrimary,
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Os responsáveis dos alunos das turmas selecionadas serão notificados.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io';
 import '../../models/models.dart';
 import '../../models/mensagem_destinatario.dart';
 import '../../services/api_service.dart';
@@ -27,8 +26,9 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
   final _titleCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
 
-  String? _selectedType;
-  String? _targetClass;
+  // Novo modelo de destinatário
+  MensagemDestinatario _destinatario = const MensagemDestinatario(tipo: TipoEnvio.geral);
+  
   DateTime? _scheduledTime;
   bool _isScheduled = false;
   bool _saving = false;
@@ -37,52 +37,66 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
   Message? _editingMessage;
   bool _loading = false;
   
-  // Turmas carregadas dinamicamente do back-end
+  // Dados carregados dinamicamente do back-end
   List<String> _classes = [];
-  bool _loadingClasses = false;
+  List<Student> _students = [];
+  List<Parent> _parents = [];
+  Map<String, List<Parent>> _studentParentsMap = {};
+  bool _loadingData = false;
 
   // Arquivos anexados
   List<PlatformFile> _selectedFiles = [];
   bool _pickingFiles = false;
 
-  final _types = [
-    ('Geral', 'geral'),
-    ('Turma', 'turma'),
-    ('Individual', 'individual'),
-  ];
-
   @override
   void initState() {
     super.initState();
-    _loadClasses();
+    _loadData();
     if (widget.messageId != null) {
       _loadMessage();
     }
   }
 
-  // ── Carregar lista de turmas do back-end ─────────────────────────────────
-  Future<void> _loadClasses() async {
-    setState(() => _loadingClasses = true);
+  // ── Carregar dados necessários do back-end ───────────────────────────────
+  Future<void> _loadData() async {
+    setState(() => _loadingData = true);
     try {
-      final students = await _api.getStudents();
-      // Extrair turmas únicas dos alunos
+      // Carregar alunos e responsáveis em paralelo
+      final results = await Future.wait([
+        _api.getStudents(),
+        _api.listParents(),
+      ]);
+      
+      final students = results[0] as List<Student>;
+      final parents = results[1] as List<Parent>;
+      
+      // Extrair turmas únicas
       final uniqueClasses = <String>{
-        'Todas as turmas',
         ...students.map((s) => s.fullClass),
       };
+      
+      // Criar mapa de aluno -> responsáveis
+      final studentParentsMap = <String, List<Parent>>{};
+      for (final student in students) {
+        studentParentsMap[student.id] = parents
+            .where((p) => p.studentIds.contains(student.id))
+            .toList();
+      }
+      
       setState(() {
-        _classes = uniqueClasses.toList()..sort((a, b) {
-          if (a == 'Todas as turmas') return -1;
-          return a.compareTo(b);
-        });
-        _loadingClasses = false;
+        _students = students;
+        _parents = parents;
+        _classes = uniqueClasses.toList()..sort();
+        _studentParentsMap = studentParentsMap;
+        _loadingData = false;
       });
     } catch (e) {
-      debugPrint('Erro ao carregar turmas: $e');
+      debugPrint('Erro ao carregar dados: $e');
       setState(() {
-        _loadingClasses = false;
-        // Fallback: manter apenas "Todas as turmas" se falhar
-        _classes = ['Todas as turmas'];
+        _loadingData = false;
+        _classes = [];
+        _students = [];
+        _parents = [];
       });
     }
   }
@@ -96,15 +110,26 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         _titleCtrl.text = msg.title;
         _contentCtrl.text = msg.content;
         
-        // Correção do parsing do tipo para evitar null ou erro de split
-        final typeStr = msg.type.toString();
-        if (typeStr.contains('.')) {
-          _selectedType = typeStr.split('.').last;
-        } else {
-          _selectedType = typeStr;
+        // Converter tipo da mensagem para MensagemDestinatario
+        TipoEnvio tipo;
+        switch (msg.type) {
+          case MessageType.turma:
+            tipo = TipoEnvio.turmas;
+            break;
+          case MessageType.individual:
+            tipo = TipoEnvio.individual;
+            break;
+          default:
+            tipo = TipoEnvio.geral;
         }
         
-        _targetClass = msg.className ?? 'Todas as turmas';
+        _destinatario = MensagemDestinatario(
+          tipo: tipo,
+          turmaIds: msg.className != null ? [msg.className!] : [],
+          alunoIds: [],
+          responsavelIds: [],
+        );
+        
         _scheduledTime = msg.scheduledAt;
         _isScheduled = msg.scheduledAt != null;
         _loading = false;
@@ -130,7 +155,6 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
   // ── Validação do passo 1 (Conteúdo) ─────────────────────────────────────
 
   bool _validateStep1() {
-    // Validar campos manualmente (não usar formKey quando não estiver no Step 0)
     final title = _titleCtrl.text.trim();
     final content = _contentCtrl.text.trim();
     
@@ -144,14 +168,17 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       return false;
     }
     
-    if (_selectedType == null) {
-      _showError('Selecione o tipo de envio');
-      return false;
-    }
-    
-    if (_selectedType == 'turma' &&
-        (_targetClass == null || _targetClass == 'Todas as turmas')) {
-      _showError('Escolha uma turma específica');
+    if (!_destinatario.isValid) {
+      switch (_destinatario.tipo) {
+        case TipoEnvio.turmas:
+          _showError('Selecione pelo menos uma turma');
+          break;
+        case TipoEnvio.individual:
+          _showError('Selecione pelo menos um aluno');
+          break;
+        default:
+          _showError('Configure os destinatários');
+      }
       return false;
     }
     
@@ -213,6 +240,17 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
+  String _getTipoLabel(TipoEnvio tipo) {
+    switch (tipo) {
+      case TipoEnvio.geral:
+        return 'Geral';
+      case TipoEnvio.turmas:
+        return 'Turmas';
+      case TipoEnvio.individual:
+        return 'Individual';
+    }
+  }
+
   Widget _buildFileIcon(String extension) {
     IconData icon;
     Color color;
@@ -247,56 +285,60 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
     return Icon(icon, color: color, size: 32);
   }
 
-  // ── Salvar como Rascunho ─────────────────────────────────────────────────
+  // ── Converter destinatário para SendMessageRequest ───────────────────────
+  SendMessageRequest _createMessageRequest({required bool isDraft, DateTime? scheduledAt}) {
+    final title = _titleCtrl.text.trim();
+    final content = _contentCtrl.text.trim();
+    
+    String type;
+    String? targetClass;
+    String? targetParentId;
+    
+    switch (_destinatario.tipo) {
+      case TipoEnvio.geral:
+        type = 'geral';
+        break;
+      case TipoEnvio.turmas:
+        type = 'turma';
+        // Por enquanto, enviar apenas a primeira turma (backend não suporta múltiplas)
+        targetClass = _destinatario.turmaIds.isNotEmpty ? _destinatario.turmaIds.first : null;
+        break;
+      case TipoEnvio.individual:
+        type = 'individual';
+        // Por enquanto, enviar apenas o primeiro responsável (backend não suporta múltiplos)
+        targetParentId = _destinatario.responsavelIds.isNotEmpty ? _destinatario.responsavelIds.first : null;
+        break;
+    }
+    
+    return SendMessageRequest(
+      title: title,
+      content: content,
+      type: type,
+      targetClass: targetClass,
+      targetParentId: targetParentId,
+      isDraft: isDraft,
+      scheduledAt: scheduledAt,
+    );
+  }
 
+  // ── Salvar como Rascunho ─────────────────────────────────────────────────
   Future<void> _saveDraft() async {
     if (!_validateStep1()) return;
 
     setState(() => _saving = true);
     try {
-      final selectedType = _selectedType;
-      if (selectedType == null || selectedType.isEmpty) {
-        _showError('Selecione o tipo de envio');
-        return;
-      }
-
-      final title = _titleCtrl.text.trim();
-      final content = _contentCtrl.text.trim();
-
-      // Validate required fields are not empty
-      if (title.isEmpty) {
-        _showError('O título não pode estar vazio');
-        return;
-      }
-      if (content.isEmpty) {
-        _showError('O conteúdo não pode estar vazio');
-        return;
-      }
-
-
-      final req = SendMessageRequest(
-        title: title,
-        content: content,
-        type: selectedType,
-        targetClass: _targetClass == 'Todas as turmas' || _targetClass == null 
-            ? null 
-            : _targetClass,
-        isDraft: true,
-        scheduledAt: _isScheduled ? _scheduledTime : null,
-      );
+      final req = _createMessageRequest(isDraft: true, scheduledAt: _isScheduled ? _scheduledTime : null);
 
       // Detectar plataforma e usar bytes no Web, paths em mobile/desktop
       List<String>? filePaths;
       List<FileUpload>? fileBytes;
       
       if (kIsWeb) {
-        // Web: usar bytes
         fileBytes = _selectedFiles.map((f) => FileUpload(
           bytes: f.bytes!,
           name: f.name,
         )).toList();
       } else {
-        // Mobile/Desktop: usar paths
         filePaths = _selectedFiles
             .where((f) => f.path != null)
             .map((f) => f.path!)
@@ -369,55 +411,22 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
 
   // ── Salvar Rascunho (Passo Final) ────────────────────────────────────────
   Future<void> _saveDraftOnly() async {
+    if (!_validateStep1()) return;
+
     setState(() => _saving = true);
     try {
-      if (!_validateStep1()) return;
-
-      final selectedType = _selectedType;
-      if (selectedType == null || selectedType.isEmpty) {
-        _showError('Selecione o tipo de envio');
-        return;
-      }
-
-      final title = _titleCtrl.text.trim();
-      final content = _contentCtrl.text.trim();
-
-      // Validate required fields are not empty
-      if (title.isEmpty) {
-        _showError('O título não pode estar vazio');
-        return;
-      }
-      if (content.isEmpty) {
-        _showError('O conteúdo não pode estar vazio');
-        return;
-      }
-
-      final targetClass = _targetClass == 'Todas as turmas' || _targetClass == null 
-          ? null 
-          : _targetClass;
-      final scheduledAt = _isScheduled ? _scheduledTime : null;
-
-      final req = SendMessageRequest(
-        title: title,
-        content: content,
-        type: selectedType,
-        targetClass: targetClass,
-        isDraft: true,
-        scheduledAt: scheduledAt,
-      );
+      final req = _createMessageRequest(isDraft: true, scheduledAt: _isScheduled ? _scheduledTime : null);
 
       // Detectar plataforma e usar bytes no Web, paths em mobile/desktop
       List<String>? filePaths;
       List<FileUpload>? fileBytes;
       
       if (kIsWeb) {
-        // Web: usar bytes
         fileBytes = _selectedFiles.map((f) => FileUpload(
           bytes: f.bytes!,
           name: f.name,
         )).toList();
       } else {
-        // Mobile/Desktop: usar paths
         filePaths = _selectedFiles
             .where((f) => f.path != null)
             .map((f) => f.path!)
@@ -426,7 +435,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
 
       final editingMessage = _editingMessage;
       if (editingMessage != null) {
-        await _api.updateMessage(editingMessage.id, req, filePaths: filePaths);
+        await _api.updateMessage(editingMessage.id, req, filePaths: filePaths, fileBytes: fileBytes);
       } else {
         await _api.createMessage(req, filePaths: filePaths, fileBytes: fileBytes);
       }
@@ -449,41 +458,11 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
 
   // ── Enviar Agora (com confirmação) ────────────────────────────────────────
   Future<void> _sendNow() async {
+    if (!_validateStep1()) return;
+
     setState(() => _saving = true);
     try {
-      if (!_validateStep1()) return;
-
-      final selectedType = _selectedType;
-      if (selectedType == null || selectedType.isEmpty) {
-        _showError('Selecione o tipo de envio');
-        return;
-      }
-
-      final title = _titleCtrl.text.trim();
-      final content = _contentCtrl.text.trim();
-
-      // Validate required fields are not empty
-      if (title.isEmpty) {
-        _showError('O título não pode estar vazio');
-        return;
-      }
-      if (content.isEmpty) {
-        _showError('O conteúdo não pode estar vazio');
-        return;
-      }
-
-      final targetClass = _targetClass == 'Todas as turmas' || _targetClass == null 
-          ? null 
-          : _targetClass;
-
-      final req = SendMessageRequest(
-        title: title,
-        content: content,
-        type: selectedType,
-        targetClass: targetClass,
-        isDraft: false,
-        scheduledAt: null,
-      );
+      final req = _createMessageRequest(isDraft: false);
 
       // Confirm final send
       if (!mounted) return;
@@ -512,13 +491,11 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       List<FileUpload>? fileBytes;
       
       if (kIsWeb) {
-        // Web: usar bytes
         fileBytes = _selectedFiles.map((f) => FileUpload(
           bytes: f.bytes!,
           name: f.name,
         )).toList();
       } else {
-        // Mobile/Desktop: usar paths
         filePaths = _selectedFiles
             .where((f) => f.path != null)
             .map((f) => f.path!)
@@ -529,43 +506,17 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       final editingMessage = _editingMessage;
       Message? saved;
       
-      try {
-        debugPrint('[SEND_NOW] Salvando mensagem antes de enviar...');
-        debugPrint('[SEND_NOW] Tipo: $selectedType');
-        debugPrint('[SEND_NOW] Turma: $targetClass');
-        debugPrint('[SEND_NOW] Título: $title');
-        debugPrint('[SEND_NOW] Anexos: ${kIsWeb ? fileBytes?.length : filePaths?.length}');
-        
-        if (editingMessage != null) {
-          debugPrint('[SEND_NOW] Atualizando mensagem existente ID: ${editingMessage.id}');
-          saved = await _api.updateMessage(editingMessage.id, req, filePaths: filePaths, fileBytes: fileBytes);
-        } else {
-          debugPrint('[SEND_NOW] Criando nova mensagem');
-          saved = await _api.createMessage(req, filePaths: filePaths, fileBytes: fileBytes);
-        }
-        
-        debugPrint('[SEND_NOW] Mensagem salva com sucesso');
-        debugPrint('[SEND_NOW] ID retornado: ${saved?.id}');
-      } catch (e, stackTrace) {
-        debugPrint('[SEND_NOW] ERRO ao salvar mensagem: $e');
-        debugPrint('[SEND_NOW] Stack trace: $stackTrace');
-        throw 'Erro ao salvar mensagem: $e';
+      if (editingMessage != null) {
+        saved = await _api.updateMessage(editingMessage.id, req, filePaths: filePaths, fileBytes: fileBytes);
+      } else {
+        saved = await _api.createMessage(req, filePaths: filePaths, fileBytes: fileBytes);
       }
 
-      // Null safety check
-      if (saved == null) {
-        debugPrint('[SEND_NOW] ERRO: saved é null após createMessage/updateMessage');
-        throw 'Erro: A mensagem não foi salva corretamente (retorno null)';
+      if (saved == null || saved.id.isEmpty) {
+        throw 'Erro: A mensagem não foi salva corretamente';
       }
 
-      if (saved.id.isEmpty) {
-        debugPrint('[SEND_NOW] ERRO: saved.id está vazio');
-        throw 'Erro: ID da mensagem salva está vazio';
-      }
-
-      debugPrint('[SEND_NOW] Enviando mensagem ID: ${saved.id}');
       await _api.sendDraft(saved.id);
-      debugPrint('[SEND_NOW] Mensagem enviada com sucesso!');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -576,9 +527,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         );
         Navigator.pop(context);
       }
-    } catch (e, stackTrace) {
-      debugPrint('[SEND_NOW] ERRO FINAL: $e');
-      debugPrint('[SEND_NOW] Stack trace final: $stackTrace');
+    } catch (e) {
       _showError('Erro ao enviar: $e');
     } finally {
       setState(() => _saving = false);
@@ -587,98 +536,43 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
 
   // ── Agendar Mensagem ──────────────────────────────────────────────────────
   Future<void> _scheduleMessage() async {
+    if (!_validateStep1() || !_validateSchedule()) return;
+
     setState(() => _saving = true);
     try {
-      if (!_validateStep1() || !_validateSchedule()) return;
-
-      final selectedType = _selectedType;
-      if (selectedType == null || selectedType.isEmpty) {
-        _showError('Selecione o tipo de envio');
-        return;
-      }
-
-      final title = _titleCtrl.text.trim();
-      final content = _contentCtrl.text.trim();
-
-      // Validate required fields are not empty
-      if (title.isEmpty) {
-        _showError('O título não pode estar vazio');
-        return;
-      }
-      if (content.isEmpty) {
-        _showError('O conteúdo não pode estar vazio');
-        return;
-      }
-
-      final targetClass = _targetClass == 'Todas as turmas' || _targetClass == null 
-          ? null 
-          : _targetClass;
-      final scheduledAt = _scheduledTime;
-
-      // Validate scheduled time
-      if (scheduledAt == null) {
+      if (_scheduledTime == null) {
         _showError('Selecione a data e hora para o agendamento');
         return;
       }
 
-      // Validate that scheduled time is in the future
-      if (scheduledAt.isBefore(DateTime.now())) {
+      if (_scheduledTime!.isBefore(DateTime.now())) {
         _showError('A data de agendamento deve ser no futuro');
         return;
       }
 
-      final req = SendMessageRequest(
-        title: title,
-        content: content,
-        type: selectedType,
-        targetClass: targetClass,
-        isDraft: true, // Mensagens agendadas devem ser salvas como rascunho
-        scheduledAt: scheduledAt,
-      );
+      final req = _createMessageRequest(isDraft: true, scheduledAt: _scheduledTime);
 
       // Detectar plataforma e usar bytes no Web, paths em mobile/desktop
       List<String>? filePaths;
       List<FileUpload>? fileBytes;
       
       if (kIsWeb) {
-        // Web: usar bytes
         fileBytes = _selectedFiles.map((f) => FileUpload(
           bytes: f.bytes!,
           name: f.name,
         )).toList();
       } else {
-        // Mobile/Desktop: usar paths
         filePaths = _selectedFiles
             .where((f) => f.path != null)
             .map((f) => f.path!)
             .toList();
       }
 
-      // Create or update with schedule (server will handle scheduling)
       final editingMessage = _editingMessage;
-      Message? result;
-      
-      try {
-        debugPrint('[SCHEDULE] Agendando mensagem...');
-        debugPrint('[SCHEDULE] Tipo: $selectedType');
-        debugPrint('[SCHEDULE] Turma: $targetClass');
-        debugPrint('[SCHEDULE] Data agendada: $scheduledAt');
-        debugPrint('[SCHEDULE] Anexos: ${kIsWeb ? fileBytes?.length : filePaths?.length}');
-        
-        if (editingMessage != null) {
-          debugPrint('[SCHEDULE] Atualizando mensagem existente ID: ${editingMessage.id}');
-          result = await _api.updateMessage(editingMessage.id, req, filePaths: filePaths, fileBytes: fileBytes);
-        } else {
-          debugPrint('[SCHEDULE] Criando nova mensagem agendada');
-          result = await _api.createMessage(req, filePaths: filePaths, fileBytes: fileBytes);
-        }
-        
-        debugPrint('[SCHEDULE] Mensagem agendada com sucesso');
-        debugPrint('[SCHEDULE] ID: ${result?.id}');
-      } catch (e, stackTrace) {
-        debugPrint('[SCHEDULE] ERRO ao agendar mensagem: $e');
-        debugPrint('[SCHEDULE] Stack trace: $stackTrace');
-        throw 'Erro ao agendar mensagem: $e';
+      if (editingMessage != null) {
+        await _api.updateMessage(editingMessage.id, req, filePaths: filePaths, fileBytes: fileBytes);
+      } else {
+        await _api.createMessage(req, filePaths: filePaths, fileBytes: fileBytes);
       }
 
       if (mounted) {
@@ -690,9 +584,7 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
         );
         Navigator.pop(context);
       }
-    } catch (e, stackTrace) {
-      debugPrint('[SCHEDULE] ERRO FINAL: $e');
-      debugPrint('[SCHEDULE] Stack trace final: $stackTrace');
+    } catch (e) {
       _showError('Erro ao agendar: $e');
     } finally {
       setState(() => _saving = false);
@@ -834,79 +726,27 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ─── Tipo de Envio ──────────────────────────────────────
-          Text(
-            'Tipo de Envio',
-            style: textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: colorScheme.onSurface,
+          // ─── Seleção de Destinatários (Widget Reutilizável) ────
+          if (_loadingData)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: AppLoadingIndicator(size: 32, color: AppTheme.accentBlue),
+              ),
+            )
+          else
+            SelecaoDestinatarioWidget(
+              destinatario: _destinatario,
+              onChanged: (novoDestinatario) {
+                setState(() {
+                  _destinatario = novoDestinatario;
+                });
+              },
+              turmasDisponiveis: _classes,
+              alunosDisponiveis: _students,
+              alunoParentsMap: _studentParentsMap,
             ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).inputDecorationTheme.fillColor,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Theme.of(context).dividerColor),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: DropdownButton<String>(
-              value: _selectedType,
-              isExpanded: true,
-              dropdownColor: Theme.of(context).cardColor,
-              underline: const SizedBox(),
-              hint: const Text('Selecione o tipo'),
-              icon: const Icon(Icons.keyboard_arrow_down),
-              items: _types
-                  .map((t) => DropdownMenuItem(
-                      value: t.$2, child: Text(t.$1)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedType = v),
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          // ─── Turma/Destinatário ─────────────────────────────────
-          Text(
-            'Destinatários',
-            style: textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).inputDecorationTheme.fillColor,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Theme.of(context).dividerColor),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: _loadingClasses
-                ? const Padding(
-                    padding: EdgeInsets.all(12.0),
-                    child: SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: AppThreeDotLoader(
-                        color: AppTheme.accentBlue,
-                      ),
-                    ),
-                  )
-                : DropdownButton<String>(
-                    value: _targetClass,
-                    isExpanded: true,
-                    dropdownColor: Theme.of(context).cardColor,
-                    underline: const SizedBox(),
-                    hint: const Text('Todas as turmas'),
-                    icon: const Icon(Icons.keyboard_arrow_down),
-                    items: _classes
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _targetClass = v),
-                  ),
-          ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 24),
 
           // ─── Título ──────────────────────────────────────────────
           Text(
@@ -1151,14 +991,12 @@ class _AdminSendMessageScreenState extends State<AdminSendMessageScreen>
               const SizedBox(height: 16),
               _ReviewInfoRow(
                 label: 'Tipo',
-                value: _types
-                    .firstWhere((t) => t.$2 == _selectedType)
-                    .$1,
+                value: _getTipoLabel(_destinatario.tipo),
               ),
               const SizedBox(height: 10),
               _ReviewInfoRow(
                 label: 'Destinatários',
-                value: _targetClass ?? 'Todas as turmas',
+                value: _destinatario.descricao,
               ),
               const SizedBox(height: 10),
               _ReviewInfoRow(

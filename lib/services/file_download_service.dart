@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FileDownloadService {
@@ -27,34 +26,21 @@ class FileDownloadService {
         throw Exception('Token de autenticação não encontrado');
       }
 
-      // Solicitar permissões se necessário (Android)
-      if (!kIsWeb && Platform.isAndroid) {
-        final status = await Permission.storage.status;
-        if (!status.isGranted) {
-          final result = await Permission.storage.request();
-          if (!result.isGranted) {
-            throw Exception('Permissão de armazenamento negada');
-          }
-        }
-      }
-
       // Determinar diretório de destino
       Directory directory;
       if (kIsWeb) {
         throw Exception('Download direto não suportado na web');
       } else if (Platform.isAndroid) {
-        // Android: usar diretório de downloads
-        directory = Directory('/storage/emulated/0/Download');
-        if (!await directory.exists()) {
-          directory = await getApplicationDocumentsDirectory();
-        }
+        // Evita permissões legadas de storage em Android 11+ salvando no espaço do app.
+        directory = await getExternalStorageDirectory() ??
+            await getApplicationDocumentsDirectory();
       } else if (Platform.isIOS) {
         // iOS: usar diretório de documentos do app
         directory = await getApplicationDocumentsDirectory();
       } else {
         // Desktop: usar diretório de downloads
-        directory = await getDownloadsDirectory() ?? 
-                   await getApplicationDocumentsDirectory();
+        directory = await getDownloadsDirectory() ??
+            await getApplicationDocumentsDirectory();
       }
 
       // Garantir nome de arquivo único
@@ -62,7 +48,7 @@ class FileDownloadService {
       int counter = 1;
       while (File(filePath).existsSync()) {
         final ext = fileName.contains('.') ? fileName.split('.').last : '';
-        final nameWithoutExt = fileName.contains('.') 
+        final nameWithoutExt = fileName.contains('.')
             ? fileName.substring(0, fileName.lastIndexOf('.'))
             : fileName;
         filePath = '${directory.path}/${nameWithoutExt}_$counter.$ext';

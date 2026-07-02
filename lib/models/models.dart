@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 
 // ─── User / Auth ───────────────────────────────────────────────────────────
@@ -82,7 +81,16 @@ class User {
 // ─── Message ────────────────────────────────────────────────────────────────
 
 enum MessageType { geral, turma, individual }
-enum MessageStatus { draft, scheduled, pending, sending, sent, cancelled, failed }
+
+enum MessageStatus {
+  draft,
+  scheduled,
+  pending,
+  sending,
+  sent,
+  cancelled,
+  failed
+}
 
 class MessageAttachment {
   final String id;
@@ -113,9 +121,43 @@ class MessageAttachment {
         'url': url,
       };
 
-  bool get isImage => fileType.startsWith('image/');
-  bool get isVideo => fileType.startsWith('video/');
-  bool get isPdf => fileType == 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
+  String get _normalizedFileType => fileType.toLowerCase().trim();
+  String get _normalizedFileName => fileName.toLowerCase().trim();
+
+  bool get isImage {
+    const imageExtensions = [
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.gif',
+      '.webp',
+      '.bmp',
+      '.heic',
+      '.heif'
+    ];
+    return _normalizedFileType == 'image' ||
+        _normalizedFileType.startsWith('image/') ||
+        imageExtensions.any(_normalizedFileName.endsWith);
+  }
+
+  bool get isVideo {
+    const videoExtensions = [
+      '.mp4',
+      '.mov',
+      '.avi',
+      '.mkv',
+      '.webm',
+      '.3gp',
+      '.m4v'
+    ];
+    return _normalizedFileType == 'video' ||
+        _normalizedFileType.startsWith('video/') ||
+        videoExtensions.any(_normalizedFileName.endsWith);
+  }
+
+  bool get isPdf =>
+      _normalizedFileType == 'application/pdf' ||
+      _normalizedFileName.endsWith('.pdf');
 }
 
 class Message {
@@ -156,7 +198,8 @@ class Message {
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
-    final rawCreatedAt = json['created_at'] ?? json['sentAt'] ?? json['createdAt'];
+    final rawCreatedAt =
+        json['created_at'] ?? json['sentAt'] ?? json['createdAt'];
     final rawScheduledAt = json['scheduled_at'] ?? json['scheduledAt'];
     final rawSentAt = json['sent_at'] ?? json['sentAt'];
 
@@ -178,12 +221,17 @@ class Message {
       title: json['title'] ?? '',
       content: json['body'] ?? json['content'] ?? '',
       sender: json['sender_name'] ?? json['sender'] ?? '',
-      createdAt: DateTime.tryParse(rawCreatedAt?.toString() ?? '') ?? DateTime.now(),
-      scheduledAt: rawScheduledAt != null ? DateTime.tryParse(rawScheduledAt.toString()) : null,
-      sentAt: rawSentAt != null ? DateTime.tryParse(rawSentAt.toString()) : null,
+      createdAt:
+          DateTime.tryParse(rawCreatedAt?.toString() ?? '') ?? DateTime.now(),
+      scheduledAt: rawScheduledAt != null
+          ? DateTime.tryParse(rawScheduledAt.toString())
+          : null,
+      sentAt:
+          rawSentAt != null ? DateTime.tryParse(rawSentAt.toString()) : null,
       isNew: !(json['read'] == true),
       type: _parseType(json['type']?.toString()),
-      status: _parseStatusFromDraft(json['is_draft'], json['status']?.toString()),
+      status:
+          _parseStatusFromDraft(json['is_draft'], json['status']?.toString()),
       className: json['className'] ?? json['class_name'],
       parentName: json['parentName'] ?? json['parent_name'],
       recipientCount: json['recipient_count'] as int?,
@@ -222,7 +270,9 @@ class Message {
       case 'sent':
         return MessageStatus.sent;
       default:
-        return (isDraft == false || isDraft == 0) ? MessageStatus.sent : MessageStatus.draft;
+        return (isDraft == false || isDraft == 0)
+            ? MessageStatus.sent
+            : MessageStatus.draft;
     }
   }
 
@@ -256,10 +306,15 @@ class Message {
     }
   }
 
-  bool get canEdit => status == MessageStatus.draft || status == MessageStatus.scheduled;
-  bool get canSend => (status == MessageStatus.draft || status == MessageStatus.scheduled) && sentAt == null;
-  bool get canCancel => status == MessageStatus.scheduled || status == MessageStatus.pending;
-  bool get canDuplicate => status == MessageStatus.sent || status == MessageStatus.draft;
+  bool get canEdit =>
+      status == MessageStatus.draft || status == MessageStatus.scheduled;
+  bool get canSend =>
+      (status == MessageStatus.draft || status == MessageStatus.scheduled) &&
+      sentAt == null;
+  bool get canCancel =>
+      status == MessageStatus.scheduled || status == MessageStatus.pending;
+  bool get canDuplicate =>
+      status == MessageStatus.sent || status == MessageStatus.draft;
 }
 
 // ─── Student ────────────────────────────────────────────────────────────────
@@ -380,7 +435,8 @@ class SendMessageRequest {
         if (targetClass != null) 'class': targetClass,
         if (targetParentId != null) 'guardian_ids': [targetParentId],
         'is_draft': isDraft,
-        if (scheduledAt != null) 'scheduled_at': scheduledAt!.toUtc().toIso8601String(),
+        if (scheduledAt != null)
+          'scheduled_at': scheduledAt!.toUtc().toIso8601String(),
       };
 }
 
@@ -431,23 +487,45 @@ class ImportResult {
 
   factory ImportResult.fromJson(Map<String, dynamic> json) {
     final errorsList = (json['errors'] as List<dynamic>?)
-            ?.map((e) => ImportError.fromJson(e is Map<String, dynamic> ? e : {}))
+            ?.map(
+                (e) => ImportError.fromJson(e is Map<String, dynamic> ? e : {}))
             .toList() ??
         [];
 
+    final importedCount = _asCounterTotal(json['imported']);
+    final skippedCount = _asCounterTotal(json['skipped'] ?? json['ignored']);
+    final totalImported = json['total_imported'] != null
+        ? _asInt(json['total_imported'], fallback: importedCount)
+        : importedCount;
+    final totalIgnored = json['total_ignored'] != null
+        ? _asInt(json['total_ignored'], fallback: skippedCount)
+        : skippedCount;
+    final totalErrors = _asInt(
+      json['total_errors'] ?? json['failed'],
+      fallback: errorsList.length,
+    );
+    final totalProcessed = _asInt(
+      json['total_processed'] ?? json['total'],
+      fallback: totalImported + totalIgnored + totalErrors,
+    );
+
     return ImportResult(
-      totalProcessed: _asInt(json['total_processed'] ?? json['total']),
-      totalImported: _asInt(json['total_imported'] ?? json['imported']),
-      totalIgnored: _asInt(json['total_ignored'] ?? json['ignored']),
-      totalErrors: _asInt(
-        json['total_errors'] ?? json['failed'],
-        fallback: errorsList.length,
-      ),
+      totalProcessed: totalProcessed,
+      totalImported: totalImported,
+      totalIgnored: totalIgnored,
+      totalErrors: totalErrors,
       errors: errorsList,
       importedAt: json['imported_at'] != null
           ? DateTime.tryParse(json['imported_at'].toString())
           : DateTime.now(),
     );
+  }
+
+  static int _asCounterTotal(dynamic value) {
+    if (value is Map) {
+      return value.values.fold<int>(0, (sum, item) => sum + _asInt(item));
+    }
+    return _asInt(value);
   }
 
   /// Converte dinamicamente qualquer valor para `int` de forma segura.
@@ -492,7 +570,8 @@ class ImportResult {
         'imported_at': importedAt?.toIso8601String(),
       };
 
-  int get successRate => totalProcessed > 0 ? ((totalImported * 100) ~/ totalProcessed) : 0;
+  int get successRate =>
+      totalProcessed > 0 ? ((totalImported * 100) ~/ totalProcessed) : 0;
   bool get hasErrors => errors.isNotEmpty && totalErrors > 0;
 }
 
@@ -564,7 +643,8 @@ class CsvRow {
   }
 
   static bool _isValidEmail(String email) {
-    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    final emailRegex =
+        RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
     return emailRegex.hasMatch(email);
   }
 
@@ -575,9 +655,11 @@ class CsvRow {
         'guardian_name': guardianName,
         'guardian_email': guardianEmail,
         'guardian_phone': guardianPhone,
-        if (guardianPhoneSecondary != null && guardianPhoneSecondary!.isNotEmpty)
+        if (guardianPhoneSecondary != null &&
+            guardianPhoneSecondary!.isNotEmpty)
           'guardian_phone_secondary': guardianPhoneSecondary,
-        if (guardianEmailSecondary != null && guardianEmailSecondary!.isNotEmpty)
+        if (guardianEmailSecondary != null &&
+            guardianEmailSecondary!.isNotEmpty)
           'guardian_email_secondary': guardianEmailSecondary,
       };
 }
@@ -597,8 +679,9 @@ class StudentParentLink {
     return StudentParentLink(
       student: Student.fromJson(json['student'] ?? {}),
       parents: (json['parents'] as List<dynamic>?)
-          ?.map((p) => Parent.fromJson(p))
-          .toList() ?? [],
+              ?.map((p) => Parent.fromJson(p))
+              .toList() ??
+          [],
     );
   }
 

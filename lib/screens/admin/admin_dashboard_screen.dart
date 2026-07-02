@@ -467,7 +467,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         // Tabs: Rascunhos / Enviadas
         TabBar(
           controller: _tabController,
-          labelColor: AppTheme.primaryBlue,
+          labelColor: AppTheme.accentBlue,
           unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
           tabs: const [
             Tab(text: 'Rascunhos'),

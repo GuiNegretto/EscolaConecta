@@ -770,48 +770,73 @@ class _AdminImportScreenState extends State<AdminImportScreen> {
   }
 
   Widget _buildStatisticsGrid(ImportResult result) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      children: [
-        _buildStatCard('Processado', result.totalProcessed.toString(), AppTheme.accentBlue),
-        _buildStatCard('Importados', result.totalImported.toString(), AppTheme.success),
-        _buildStatCard('Ignorados', result.totalIgnored.toString(), AppTheme.warning),
-        _buildStatCard('Erros', result.totalErrors.toString(), AppTheme.danger),
-      ],
+    final cards = [
+      _buildStatCard('Processado', result.totalProcessed.toString(), AppTheme.accentBlue),
+      _buildStatCard('Importados', result.totalImported.toString(), AppTheme.success),
+      _buildStatCard('Ignorados', result.totalIgnored.toString(), AppTheme.warning),
+      _buildStatCard('Erros', result.totalErrors.toString(), AppTheme.danger),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 520) {
+          return Row(
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(child: cards[i]),
+              ],
+            ],
+          );
+        }
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                SizedBox(width: 126, child: cards[i]),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildStatCard(String label, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             value,
             style: TextStyle(
               color: color,
-              fontSize: 24,
+              fontSize: 20,
               fontWeight: FontWeight.w700,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
           Text(
             label,
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
             ),
-            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
